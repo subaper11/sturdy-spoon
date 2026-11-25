@@ -7,6 +7,7 @@ import { nameHtml, nameIso } from './names.js';
 import { tick, nextTurn } from './game.js';
 import { clearFlash } from './flash.js';
 import { stampWord } from './stamp.js';
+import { html, raw } from './safehtml.js';
 import { rulesDetails, idhafaReminder } from './wordrules.js';
 
 export function openJudge() {
@@ -24,7 +25,7 @@ export function abortJudge() {
 function renderJudge() {
   const e = app.judge.e;
   $('#jT').textContent = 'تحكيم الحركة';
-  $('#jB').innerHTML = `<p>${nameHtml(e.p)} · الحركة ${e.n} · ${e.total} نقطة</p>${chips(e)}<p>ما حكم الكلمة؟</p>${idhafaReminder()}${rulesDetails()}`
+  $('#jB').innerHTML = html`<p>${nameHtml(e.p)} · الحركة ${e.n} · ${e.total} نقطة</p>${chips(e)}<p>ما حكم الكلمة؟</p>${raw(idhafaReminder())}${raw(rulesDetails())}`
     + '<div class="vrow"><button class="btn yes" data-a="yes">✔ صحيح</button><button class="btn danger" data-a="no">✖ خطأ</button></div>'
     + '<button class="btn" data-a="close">إلغاء</button>';
   localize($('#jT')); localize($('#jB'));

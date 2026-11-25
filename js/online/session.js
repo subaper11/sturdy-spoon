@@ -5,6 +5,7 @@
 //   Network state machine:  CONNECTING -> CONNECTED <-> RECONNECTING / OFFLINE, SYNCING while a snapshot is being fetched.
 //   Presence: every action and a heartbeat (HEARTBEAT_MS, page visible) tell the server we are here. If the player the match is waiting for stays silent
 //   for ABANDON_MS, the other player may end the match in their favour ("claim_abandon"); the server alone decides whether that is allowed.
+import { html } from '../safehtml.js';
 import { localize } from '../i18n.js';
 import { RACK, REASONS, HEARTBEAT_MS, ABANDON_MS } from '../config.js';
 import { $, S, BY, app } from '../state.js';
@@ -295,7 +296,7 @@ net.openTahkim = async function () {
   if (net.peerOld) return void warn('الخصم يستخدم نسخة مختلفة من اللعبة ولن يرى نافذة التحكيم. اطلب منه تحديث الصفحة أولًا.');
   app.judge = { e: last, online: true, kind: 'reason' };
   $('#jT').textContent = 'طلب تحكيم';
-  $('#jB').innerHTML = `<p>${nameHtml(last.p)} · الحركة ${last.n} · ${last.total} نقطة</p>${chips(last)}`
+  $('#jB').innerHTML = html`<p>${nameHtml(last.p)} · الحركة ${last.n} · ${last.total} نقطة</p>${chips(last)}`
     + `<label class="tkLbl" for="tkReason">سبب التحكيم (إلزامي)</label>`
     + `<textarea id="tkReason" class="tkReason" rows="3" maxlength="${REASON_MAX}" required aria-describedby="tkHint" placeholder="مثال: «كتابي» إضافة بضمير متصل، وهي غير مسموحة"></textarea>`
     + `<div class="tkMeta"><span id="tkHint" class="tkHint">اكتب ${REASON_MIN} أحرف على الأقل. عند الإرسال تُفتح نافذة نقاش مشتركة عند اللاعبَين وتتوقف الساعتان حتى تتفقا على الحكم.</span><span id="tkN" class="tkN" dir="ltr">0/${REASON_MAX}</span></div>`

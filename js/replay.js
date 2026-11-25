@@ -4,6 +4,7 @@
 import { SIZE, LAYOUT, GLYPH, FACE, LABEL } from './config.js';
 import { tileValue } from './modes.js';
 import { $, S, app } from './state.js';
+import { html } from './safehtml.js';
 import { nameIso, esc } from './names.js';
 import { L3, bt } from './i18n.js';
 import { sqHTML } from './ui.js';
@@ -126,7 +127,7 @@ function placeChip(s) {
   if (!s || s.k === 'end' || s.k === 'ok' || s.k === 'void') { c.hidden = true; return; }
   const e = s.e;
   c.className = 'rpChip p' + e.p;
-  if (s.k === 'move') c.innerHTML = e.words.map(w => `<span>${esc(w.w)} <b>${w.pts}</b></span>`).join('') + `<em>+${e.total}</em>`;
+  if (s.k === 'move') c.innerHTML = html`${e.words.map(w => html`<span>${w.w} <b>${w.pts}</b></span>`)}<em>+${e.total}</em>`;
   else c.innerHTML = `<span>${s.k === 'pass' ? L3('تمرير', 'Lewati', 'Pass') : L3('تبديل', 'Tukar', 'Swap') + ' ' + e.cnt}</span>`;
   c.hidden = false;
   const wr = wrap.getBoundingClientRect();

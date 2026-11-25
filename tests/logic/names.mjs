@@ -23,8 +23,8 @@ ok(!r.dup, 'the other player may take a default name nobody uses now');
 N.setName(1, '');
 ok(N.nameOf(1) === NAMES[1], 'empty = default');
 ok(JSON.stringify(JSON.parse(mem.get('scrabble.names'))) === JSON.stringify({ v: 1, n: ['Layla', null] }), 'only overrides are stored');
-ok(N.nameHtml(0) === '<bdi>Layla</bdi>' && N.nameIso(0) === '\u2068Layla\u2069' && N.nameIso(1) === NAMES[1], 'html isolated, plain text isolated only when custom');
-N.setName(0, '<b>x</b>'); ok(N.nameHtml(0) === '<bdi>&lt;b&gt;x&lt;/b&gt;</bdi>', 'html-escaped on output');
+ok(String(N.nameHtml(0)) === '<bdi>Layla</bdi>' && N.nameIso(0) === '\u2068Layla\u2069' && N.nameIso(1) === NAMES[1], 'html isolated, plain text isolated only when custom');
+N.setName(0, '<b>x</b>'); ok(String(N.nameHtml(0)) === '<bdi>&lt;b&gt;x&lt;/b&gt;</bdi>', 'html-escaped on output');
 N.setName(0, ''); ok(!mem.has('scrabble.names'), 'back to defaults removes the key');
 off();
 // loading

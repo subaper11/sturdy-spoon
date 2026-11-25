@@ -3,6 +3,7 @@ import { showFloat, gameInert, lockGame } from './float.js';
 import { SIZE, DURATIONS, BINGO, TOAST_MS, LAYOUT, GLYPH, FACE, LABEL, MIN_BAG_SWAP, TIME_BONUS_PER_MIN, INCREMENT_MS } from './config.js';
 import { TILE_MODES, tileValue, tileAlpha } from './modes.js';
 import { $, S, app, fmt, inMove, cur, profile, bagCount } from './state.js';
+import { html, raw } from './safehtml.js';
 import { nameOf, nameHtml, nameIso, esc, onNamesChange } from './names.js';
 import { haptic } from './haptics.js';
 import { analyze, scoreWords } from './scoring.js';
@@ -262,13 +263,13 @@ export function tickUI() {
   });
 }
 // Word chips shared by the history list and the judge dialog.
-export const chips = e => `<div class="jw">${e.words.map(w => `<span class="chip">${w.w} <b>${w.pts}</b></span>`).join('')}${e.bingo ? '<span class="chip bingo">+' + BINGO + '</span>' : ''}</div>`;
+export const chips = e => html`<div class="jw">${e.words.map(w => html`<span class="chip">${w.w} <b>${w.pts}</b></span>`)}${e.bingo ? raw('<span class="chip bingo">+' + BINGO + '</span>') : ''}</div>`;
 function histItem(e) {
   const cls = 'hi p' + e.p + (e.st === 'void' ? ' void' : ''), who = nameHtml(e.p);
   if (e.type !== 'move')
-    return `<li class="${cls}"><div class="hh"><span class="hn">${e.n}</span><span>${who} — ${e.type === 'pass' ? 'مرّر الدور' : `بدّل ${e.cnt} قطع`}</span></div></li>`;
-  const j = e.st ? `<div class="hj ${e.st}">${e.st === 'ok' ? '✔ صحيح' : '✖ خطأ'}${e.pen ? ` · غرامة التحدي −${e.pen}` : ''}</div>` : '';
-  return `<li class="${cls}"><div class="hh"><span class="hn">${e.n}</span><span>${who}</span><b class="hp">${e.st === 'void' ? 0 : '+' + e.total}</b></div>${chips(e)}${j}<button type="button" class="hTkBtn" aria-label="تحكيم" title="تحكيم"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 21h14M6 7h12M6 7l-3 7a3 3 0 006 0zM18 7l-3 7a3 3 0 006 0z"/></svg></button></li>`;
+    return html`<li class="${cls}"><div class="hh"><span class="hn">${e.n}</span><span>${who} — ${e.type === 'pass' ? 'مرّر الدور' : `بدّل ${e.cnt} قطع`}</span></div></li>`;
+  const j = e.st ? html`<div class="hj ${e.st}">${e.st === 'ok' ? '✔ صحيح' : '✖ خطأ'}${e.pen ? ` · غرامة التحدي −${e.pen}` : ''}</div>` : '';
+  return html`<li class="${cls}"><div class="hh"><span class="hn">${e.n}</span><span>${who}</span><b class="hp">${e.st === 'void' ? 0 : '+' + e.total}</b></div>${chips(e)}${j}<button type="button" class="hTkBtn" aria-label="تحكيم" title="تحكيم"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 21h14M6 7h12M6 7l-3 7a3 3 0 006 0zM18 7l-3 7a3 3 0 006 0z"/></svg></button></li>`;
 }
 function renderHist() {
   if (hs.id === app.gameId && hs.v === S.hv) return;

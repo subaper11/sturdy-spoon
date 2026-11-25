@@ -11,7 +11,7 @@ const TS = ['--experimental-transform-types', '--no-warnings'];   // suites that
 const N = (g, f, ...a) => ({ g, cmd: 'node', args: [...(f.startsWith('!') ? TS : []), f.replace('!', ''), ...a] }), P = (g, f) => ({ g, cmd: PY, args: [f] });
 const SUITES = [
   N('unit', '../tools/sync-edge-shared.mjs', '--check'),
-  ...['logic/engine.mjs', 'logic/endgame.mjs', 'logic/startup.mjs', 'logic/names.mjs', 'logic/dropgeom.mjs'].map(f => N('unit', f)),
+  ...['logic/engine.mjs', 'logic/endgame.mjs', 'logic/startup.mjs', 'logic/names.mjs', 'logic/xss.mjs', 'logic/dropgeom.mjs'].map(f => N('unit', f)),
   ...['rooms', 'game', 'security', 'network', 'endgame', 'abandon', 'pause-undo', 'parity', 'tahkim-reason', 'draft', 'explain', 'first-draw', 'env-build', 'hardening', 'tahkim-consensus', 'tahkim-timeout', 'jwt', 'cors', 'body', 'ratelimit', 'chat', 'adaptive'].map(f => N('server', `online/${f}.mjs`)),
   N('server', '!online/heartbeat.mjs'),
   N('db', '!db/postgres.mjs'),   // real Postgres (PGlite): all migrations, the real SupabaseStore, RLS as the API roles see it

@@ -148,3 +148,14 @@ Every phase below states which groups it could run. Browser groups stay unverifi
 - **5.4 chat/tahkim_log out of `games.ext`: NOT done.** The brief makes it depend on Fase 3 (spectators, N players), which was not built; moving it now would change the snapshot shape twice.
 - **5.5 limit loading of `moves`: NOT done.** Every action that returns a snapshot needs the move list (`historyItem`), and the actions that do not return one already use `loadLite` (heartbeat). Nothing left to skip without changing the answer.
 - **5.6 region note** added to `docs/DEPLOYMENT.md` in Fase 4.
+
+### Fase 6
+- **6.1 done.** Consolidation = the migration-05 body without `rd`; a db test compares both bodies (whitespace-normalised) so "behaviour unchanged" is checked, not claimed.
+- **6.2 partial.** The code base already escaped with `esc()` at the data-carrying sites; the one real gap found was `chips()` in `js/ui.js` (`w.w` unescaped). Migrated the sites that carry nicknames, words or server values (ui.js history/chips, judge.js, session.js verdict, lobby seats, replay chips). NOT migrated: about 30 `innerHTML` assignments that insert only constants or build DOM from static strings (i18n.js, overlay.js, themes.js, haptics.js, prefs.js, cover.js, layout.js, persist.js, float-input.js, peek.js, rulesview.js, tkpress.js, nameedit.js, names.js, tahkim-ui.js, hud.js). I read their templates for `${}` of user data and found none, but did not convert them. `tests/logic/names.mjs` now compares `String(nameHtml(...))` because the function returns a trusted fragment object instead of a string; the asserted HTML is unchanged.
+- **6.3** plan written, nothing implemented (as asked).
+- **6.4** CHANGELOG, MIGRATIONS, ONLINE_ARCHITECTURE, DEPLOYMENT updated along the way; version is 5.12.0.
+
+## Ditunda / Dibatalkan (summary)
+- **Fase 3 entire (roles, spectators, judge, 3-4 players): not started beyond the audit.** It touches the local game engine (`js/state.js`, `js/game.js`, `js/rules.js`) and about 20 client files, and its layout cannot be verified without a browser. Per the brief ("do not leave half done") nothing was left half done.
+- **5.2, 5.3, 5.4, 5.5:** see Fase 5 above.
+- **4.1 enforcing CSP:** needs browser suites.

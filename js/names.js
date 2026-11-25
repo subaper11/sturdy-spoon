@@ -20,14 +20,14 @@ export function cleanName(raw) {
 }
 const same = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }) === 0;   // ignores case and Arabic marks, so "Ali" and "ali" are one name
 
-const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-export const esc = s => String(s).replace(/[&<>"']/g, c => ESC[c]);
+import { esc, raw } from './safehtml.js';
+export { esc };
 
 export const MAX_NAME = MAX;
 export const nameOf = i => names[i];
 export const isCustom = i => names[i] !== NAMES[i];
 // For innerHTML: escaped and isolated, so a Latin name never reorders the Arabic text around it.
-export const nameHtml = i => `<bdi>${esc(names[i])}</bdi>`;
+export const nameHtml = i => raw(`<bdi>${esc(names[i])}</bdi>`);   // a trusted fragment: safe inside html`...`, and still a string in plain templates
 // For plain text (toasts, dialogue text): a custom name is wrapped in direction isolates; the default Arabic names stay exactly as they were.
 export const nameIso = i => isCustom(i) ? `\u2068${names[i]}\u2069` : names[i];
 

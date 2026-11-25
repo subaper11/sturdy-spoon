@@ -7,6 +7,7 @@ import { DURATIONS } from '../config.js';
 import { TILE_MODES } from '../modes.js';
 import { $ } from '../state.js';
 import { esc } from '../names.js';
+import { html, raw } from '../safehtml.js';
 import { net, connect, enter, configured, resumeOpenGame } from './session.js';
 
 const NICK = 'scrabble.online.nick';
@@ -73,7 +74,7 @@ function roomView(snap) {
     const p = snap.players.find(x => x.seat === i);
     if (!p) return `<li class="lbSeat empty"><span class="lbWho">بانتظار لاعب…</span><span class="lbTag wait">مقعد فارغ</span></li>`;
     const tag = i === 0 ? '<span class="lbTag host">المضيف</span>' : p.ready ? '<span class="lbTag ok">جاهز</span>' : '<span class="lbTag wait">لم يؤكد بعد</span>';
-    return `<li class="lbSeat${i === me ? ' me' : ''}"><span class="lbWho"><bdi>${esc(p.nickname)}</bdi>${i === me ? ' <small>(أنت)</small>' : ''}</span>${tag}</li>`;
+    return html`<li class="lbSeat${i === me ? ' me' : ''}"><span class="lbWho"><bdi>${p.nickname}</bdi>${i === me ? raw(' <small>(أنت)</small>') : ''}</span>${raw(tag)}</li>`;
   };
   const modes = Object.values(TILE_MODES).map(m => `<button class="btn lbOpt" data-a="mode" data-v="${m.id}" aria-pressed="${g.tile_mode === m.id}"${host ? '' : ' disabled'}>${m.labelAr}</button>`).join('');
   const mins = DURATIONS.map(m => `<button class="btn lbOpt" data-a="min" data-v="${m}" aria-pressed="${g.minutes === m}"${host ? '' : ' disabled'}>${m}</button>`).join('');
