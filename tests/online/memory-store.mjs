@@ -38,6 +38,11 @@ export class MemoryStore {
   }
   // Same contract as the SQL limiter, kept per store like the table is per database: fixed window from the first miss.
   joinBlocked(keys, maxes, windowMs, now) { this.misses ||= new Map(); return keys.some((k, i) => { const m = this.misses.get(k); return !!m && m.n >= maxes[i] && now - m.since < windowMs; }); }
+  rateHit(keys, maxes, windowMs, now) {   // same contract as eas_rate_hit: fixed window from the first hit, every attempt counts, true when any key is over its max
+    this.hits ||= new Map(); let over = false;
+    keys.forEach((k, i) => { const m = this.hits.get(k); if (!m || now - m.since >= windowMs) this.hits.set(k, { n: 1, since: now }); else m.n++; if (this.hits.get(k).n > maxes[i]) over = true; });
+    return over;
+  }
   joinMiss(keys, windowMs, now) { this.misses ||= new Map(); for (const k of keys) { const m = this.misses.get(k); if (!m || now - m.since >= windowMs) this.misses.set(k, { n: 1, since: now }); else m.n++; } }
   async touch(gameId, userId, state, now) {   // same contract as SupabaseStore.touch: throws without a seat row, never rewinds a newer last_seen_at, honours injected failures
     if (this.failTouch) throw new Error(this.failTouch);

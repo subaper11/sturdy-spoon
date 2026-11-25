@@ -11,6 +11,7 @@
 //                                       throws {code:'STALE_REVISION'} when the revision moved; applies everything atomically
 //   touch(gameId, userId, state, now) -> void         connection_state / last_seen_at only; never bumps the revision; THROWS if it could not persist
 //   joinBlocked(keys, maxes, windowMs, now) -> boolean   room-code guessing: does any key already have its max misses in the window?
+//   rateHit(keys, maxes, windowMs, now)  -> boolean   counts one attempt per key (atomic, shared) and says whether any key is now over its max (create_room limiter)
 //   joinMiss(keys, windowMs, now)     -> void         records one failed guess per key (atomic; shared across server instances)
 import { GameError, fail, MSG } from './errors.js';
 import * as E from './engine.js';
@@ -30,6 +31,16 @@ const NO_EXPIRY_CHECK = new Set(['resign_game', 'claim_timeout', 'claim_abandon'
 const JOIN_FAILS_MAX = 8, JOIN_NET_FAILS_MAX = 30, JOIN_WINDOW_MS = 60000;
 const joinKeys = (userId, deps) => [`u:${userId}`, ...(deps.netKey ? [`n:${deps.netKey}`] : [])];
 const joinMaxes = keys => keys.map(k => k.startsWith('n:') ? JOIN_NET_FAILS_MAX : JOIN_FAILS_MAX);
+
+// create_room: counted per player and per network address, per minute and per hour. The network key is looser (a school or a carrier shares one address).
+const CREATE_LIMITS = [[60000, 5, 15, 'm'], [3600000, 30, 120, 'h']];   // [window ms, per player, per network, key suffix]
+async function createLimited(store, userId, deps, now) {
+  for (const [win, mu, mn, sfx] of CREATE_LIMITS) {
+    const keys = [`c:${userId}:${sfx}`, ...(deps.netKey ? [`c:n:${deps.netKey}:${sfx}`] : [])];
+    if (await store.rateHit(keys, keys.map(k => k.startsWith('c:n:') ? mn : mu), win, now)) return true;
+  }
+  return false;
+}
 
 const rejected = (e, snapshot) => ({ ok: false, code: e.code, message: e.message || MSG[e.code] || MSG.SERVER_ERROR, ...(e.extra || {}), ...(snapshot ? { snapshot } : {}) });
 
@@ -121,6 +132,7 @@ async function reconnect(store, userId, now, deps) {
 async function createRoom(store, userId, body, now, deps) {
   const existing = await store.findOpenGameId(userId);
   if (existing) fail('ALREADY_IN_GAME', MSG.ALREADY_IN_GAME, { snapshot: (await snapshotResponse(store, userId, existing, now)).snapshot });
+  if (await createLimited(store, userId, deps, now)) fail('RATE_LIMITED');   // after the ALREADY_IN_GAME answer: returning to your own game is not creating one
   const { live, ...cols } = E.sanitizeSettings(body.settings);
   const settings = { tile_mode: DEFAULT_MODE, minutes: DEFAULT_MINUTES, validator_mode: 'off', ...cols };   // validator_mode is a legacy column: words are judged by Tahkim only
   const nick = cleanNickname(body.nickname);

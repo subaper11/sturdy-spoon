@@ -46,3 +46,91 @@ Every phase below states which groups it could run. Browser groups stay unverifi
 - **Tahkim rules reference text changed** (one sentence in `js/tahkim-rules.js` and its English entry in `js/rules-en.js`): it used to promise "no time limit", which would now be false. Earlier you asked that Tahkim dialog rules not change without asking; this is the minimum to keep the reference true to the engine. Revert that sentence if you prefer, but the reference would then be wrong.
 - Rejected: auto-closing from the heartbeat or `claim_*` paths (would be a hidden side effect of unrelated requests); declaring the move void on timeout (rewards the player who stalls).
 - Not run here: the layout/e2e tests that render the Tahkim card (no browser). The countdown ticks with a 1 s `setInterval` that is cleared in `hideTahkim()`; verify on a device.
+
+### Fase 3 audit: two-player assumptions (grep, 85 lines; comment lines excluded)
+
+- `js/dropgeom.js:13` const span = 3 * lift, y1 = yMax - span, c1 = y1 - lift;   // the fade starts at y1, where the plain drop poin
+- `js/firstdraw.js:57` [0, 1].forEach(i => {
+- `js/float-geom.js:16` a.w = Math.max(0, a.x1 - a.x0); a.h = Math.max(0, a.y1 - a.y0);
+- `js/float-geom.js:23` if (!loose) return [clamp(x, a.x0, a.x1 - w), clamp(y, a.y0, a.y1 - h)];
+- `js/float-geom.js:24` const rx = [a.x1 - w - e, a.x0], ry = [a.y1 - h - e, a.y0];
+- `js/float-input.js:45` else if (t.def.popup) setSize(t, Math.min(r.width + dw, a.x1 - r.left));
+- `js/float-layout.js:36` const yP = clamp(a.y0 + (bh - stackH) / 2, a.y0, Math.max(a.y0, a.y1 - stackH));
+- `js/float-layout.js:38` const yC = clamp(a.y0 + (bh - (hc + M + ht)) / 2, a.y0, Math.max(a.y0, a.y1 - hc - M - ht));   // Turn Control
+- `js/float-layout.js:42` const below = yP + stackH + M, room = a.y1 - below, wid = clamp(pw, 200, Math.min(limits(T.hist).maxW, a.w));
+- `js/float-layout.js:47` const bx = a.x0 + (a.w - s) / 2, lx = Math.max(a.x0, bx - M - pw), rx = Math.min(a.x1 - pw, bx + s + M);
+- `js/float-layout.js:55` const wid = clamp(colW, 200, Math.min(560, a.w)), below = yL + hl + ht + M, room = a.y1 - below;
+- `js/float-layout.js:71` else { g[left] = { x: a.x0, y: yP, w: pw }; g[right] = { x: a.x1 - pw, y: yP, w: pw }; }
+- `js/float-layout.js:72` if (row) { g.ctrls = { x: rtl ? a.x1 - tw : a.x0, y: yC, w: tw }; g.tools = { x: rtl ? a.x0 : a.x1 - uw, y: yC
+- `js/float-layout.js:75` g.hist = histOn && a.y1 - below >= 150 ? { x: a.x0, y: below, w: a.w, h: Math.min(a.y1 - below, 560) }
+- `js/float-layout.js:89` const bb = things.board?.el.getBoundingClientRect(), free = bb ? Math.max(bb.left - a.x0, a.x1 - bb.right) - 6
+- `js/float-popups.js:32` const xs = [a.x0, (a.x0 + a.x1 - w) / 2, a.x1 - w], ys = [a.y0, (a.y0 + a.y1 - h) / 2, a.y1 - h];
+- `js/float-popups.js:33` const tries = orient() === 'portrait' ? [[1, 0], [1, 2], [0, 0], [2, 0], [0, 2], [2, 2], [0, 1], [2, 1], [1, 1
+- `js/float-popups.js:34` : [[0, 0], [2, 0], [0, 2], [2, 2], [0, 1], [2, 1], [1, 0], [1, 2], [1, 1]];
+- `js/game.js:80` if (!setTurn(1 - S.cur)) return;
+- `js/nameedit.js:78` box.innerHTML = [0, 1].map(i => `<div class="segRow nmRow"><label class="setRowHead" for="nm${i}">اسم اللاعب $
+- `js/names.js:44` if (!s // s.v !== 1 // !Array.isArray(s.n) // s.n.length !== 2) return;
+- `js/names.js:53` if (same(v, names[1 - i])) return { name: names[i], dup: true, changed: false };
+- `js/online/hud.js:11` const SEATS = [0, 1], last = { game: -1, score: [null, null] };
+- `js/online/hud.js:36` const online = you ? net.view.state !== 'OFFLINE' && net.view.state !== 'RECONNECTING' : net.view.opp;
+- `js/online/hud.js:58` const g = app.net.snap.game, opp = nameOf(1 - me);
+- `js/online/hud.js:59` const t = !live ? '' : g.status === 'tahkim_pending' ? 'التحكيم قائم' : g.pause ? 'اللعبة متوقفة' : S.cur === 
+- `js/online/session.js:39` backend: null, userId: null, snap: null, seat: 0, state: 'CONNECTING', opp: false, busy: false, key: '', clock
+- `js/online/session.js:42` view: { state: 'CONNECTING', opp: true }   // what the bar SHOWS (see show()); the fields above are what is tr
+- `js/online/session.js:75` app.net = net; app.firstRun = false; net.snap = null; net.key = ''; net.view = { state: net.state, opp: true }
+- `js/online/session.js:103` oppId: () => net.snap?.players?.find(p => p.player_id !== net.userId)?.player_id // null,
+- `js/online/session.js:105` const opp = ids.some(u => u !== net.userId); if (opp !== net.opp) { net.opp = opp; show('opp', opp, !opp); if 
+- `js/online/session.js:116` else { setState('RECONNECTING'); net.opp = false; show('opp', false, true); clearTimeout(net.resub); net.resub
+- `js/online/session.js:138` net.oppIdle = { ms: r.opp_idle_ms ?? 0, at: Date.now() };
+- `js/online/session.js:164` setRemoteNames([0, 1].map(i => snap.players.find(p => p.seat === i)?.nickname // ''));
+- `js/online/session.js:188` S.players = [0, 1].map(i => {
+- `js/online/session.js:461` function dropGhostSoon(ms = GHOST_KEEP_MS) { clearTimeout(net.ghostTimer); net.ghostTimer = setTimeout(() => {
+- `js/online/session.js:472` const rows = [0, 1].map(i => { const l = r.lines.find(x => x.seat === i) // { score: 0, raw: 0, ded: 0, mins: 
+- `js/online/session.js:499` const waitingOnOpp = () => { const s = net.snap; return !!s && ['active', 'tahkim_pending'].includes(s.game.st
+- `js/online/session.js:507` const g = net.snap?.game, opp = 1 - net.seat, name = nameIso(opp), V = net.view;
+- `js/online/session.js:509` if (!t && g && g.status === 'tahkim_pending') { const v = g.tahkim.votes // [null, null]; t = v[net.seat] ? (v
+- `js/online/session.js:512` if (!t && waitingOnOpp() && !V.opp) t = `${name} غير متصل — بانتظار عودته…`;
+- `js/online/session.js:513` if (!t && g && g.status === 'finished' && (g.rematch_seats // []).includes(opp)) t = `${name} يطلب إعادة المبا
+- `js/online/session.js:517` const bad = V.state !== 'CONNECTED' // (!!g && g.status === 'active' && !V.opp);
+- `js/online/session.js:529` if (ok && over) setText(ok, (g.rematch_seats // []).includes(opp) ? 'قبول إعادة المباراة' : 'إعادة المباراة');
+- `js/online/session.js:536` const g = net.snap?.game, claim = waitingOnOpp() && !net.view.opp && net.view.state === 'CONNECTED';
+- `js/online/session.js:557` const show = waitingOnOpp() && !net.view.opp && net.view.state === 'CONNECTED';
+- `js/online/supabase-backend.js:67` const st = ch.presenceState(), oppId = h.oppId?.() // null;
+- `js/online/supabase-backend.js:69` const ids = oppId ? Object.keys(st).filter(k => k === userId // k === oppId) : Object.keys(st), other = oppId 
+- `js/online/tahkim-ui.js:127` const g = snap.game, t = g.tahkim, me = snap.me.seat, opp = 1 - me, N = ctx.names, chat = t.chat // [], votes 
+- `js/online/tahkim-ui.js:149` const chips = $('#tkChips'), cs = [me, opp].map(s => `${s === me ? 'أنت' : N[s]}: ${votes[s] ? VERDICT[votes[s
+- `js/online/tahkim-ui.js:151` const mine = votes[me], theirs = votes[opp];
+- `js/online/tahkim-ui.js:155` : mine ? `اخترتَ ${VERDICT[mine]} — بانتظار اختيار ${N[opp]}. لا يُحسم التحكيم إلا إذا اختار الاثنان الحكم نفس
+- `js/online/tahkim-ui.js:156` : theirs ? `${N[opp]} اختار ${VERDICT[theirs]}. اختر حكمك ثم أكّده.`
+- `js/persist.js:25` if (!grid(board) // !Array.isArray(racks) // racks.length !== 2 // !Array.isArray(bag)) return false;
+- `js/persist.js:49` if (!Array.isArray(d.scores) // d.scores.length !== 2 // !d.scores.every(s => isInt(s, 0, 1e6))) return false;
+- `js/persist.js:50` if (!Array.isArray(d.times) // d.times.length !== 2 // !d.times.every(t => Number.isFinite(t) && t > 0 && t <=
+- `js/replay.js:47` else if (s.k === 'ok') score[1 - e.p] -= e.pen // 0;
+- `js/replay.js:64` <div class="rpScores">${[0, 1].map(p => `<div class="rpS" data-p="${p}"><span class="rpName"><bdi>${esc(nm(p))
+- `js/replay.js:138` if (t < 2) t = y1 - wr.top + 6;   // no room above the word: below it
+- `js/rules.js:30` for (const e of m) for (const [dr, dc] of [[0, 1], [1, 0]]) {
+- `js/stamp.js:13` for (const [dr, dc] of [[0, 1], [1, 0]]) {
+- `js/state.js:51` players: [0, 1].map(() => ({rack: Array(RACK).fill(null), score: 0, ms: min * 60000})),
+- `js/ui.js:26` if (!$('#pn0')) $('#players').innerHTML = [0, 1].map(i => `<div class="panel" id="pn${i}"><div class="phead"><
+- `js/ui.js:33` [0, 1].forEach(i => {
+- `supabase/functions/_shared/core/engine.js:35` const other = seat => 1 - seat;
+- `supabase/functions/_shared/core/engine.js:75` w.game.current_seat = other(w.game.current_seat);
+- `supabase/functions/_shared/core/engine.js:166` if (w.players.length !== 2) fail('NEED_OPPONENT');
+- `supabase/functions/_shared/core/engine.js:194` const g = w.game, seats = [0, 1];
+- `supabase/functions/_shared/core/engine.js:198` if (forfeit) lines = seats.map(s => ({ seat: s, score: playerBySeat(w, s).score, raw: playerBySeat(w, s).score
+- `supabase/functions/_shared/core/engine.js:200` const res = settleEnd(seats.map(s => ({ score: playerBySeat(w, s).score, rack: rackOf(w, s), ms: playerBySeat(
+- `supabase/functions/_shared/core/engine.js:202` seats.forEach(s => { playerBySeat(w, s).score = lines[s].score; });
+- `supabase/functions/_shared/core/engine.js:205` if (forfeit) win = other(loserSeat);
+- `supabase/functions/_shared/core/engine.js:357` const rec = { move_number: t.move_number, round: g.round, words: t.words // [], challenger_seat: t.challenger_
+- `supabase/functions/_shared/core/engine.js:369` const rec = { move_number: t.move_number, round: g.round, words: t.words // [], challenger_seat: challenger, r
+- `supabase/functions/_shared/core/engine.js:488` export const blockingSeat = (g, viewer) => (g.status === STATUS.TAHKIM ? (viewer == null ? null : other(viewer
+- `supabase/functions/_shared/core/service.js:110` return { ok: true, revision, status, server_now: now, opp_idle_ms: E.idleMs(w, 1 - seat, now) };
+- `supabase/functions/_shared/core/service.js:154` if (w.game.status !== E.STATUS.LOBBY) fail(w.players.length >= 2 ? 'ROOM_FULL' : 'GAME_STARTED');
+- `supabase/functions/_shared/core/service.js:155` if (w.players.length >= 2) fail('ROOM_FULL');
+- `supabase/functions/_shared/core/snapshot.js:30` pause: extOf(g).pause // null, pauses_left: [0, 1].map(i => Math.max(0, PAUSES_EACH - ((extOf(g).pauses // [0,
+- `supabase/functions/_shared/game/rules.js:31` for (const e of m) for (const [dr, dc] of [[0, 1], [1, 0]]) {
+- `supabase/migrations/20261024000001_eas_online_schema.sql:22` current_seat        smallint check (current_seat in (0,1)),
+- `supabase/migrations/20261024000001_eas_online_schema.sql:50` seat             smallint not null check (seat in (0,1)),   -- a future referee would get a role column and a 
+- `supabase/migrations/20261024000003_eas_online_functions.sql:51` -- seats
+- `supabase/migrations/20261101000005_eas_v5_1_pause_undo_live.sql:51` -- seats
+- `supabase/migrations/20261104000007_eas_v5_4_hardening.sql:23` --    Deleting a user cascades to their finished games' seats, racks and moves (see the on delete cascade refe

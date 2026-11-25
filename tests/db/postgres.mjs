@@ -20,8 +20,8 @@ const giveRack = (w, k, letters) => w.db.query('update public.player_racks set t
 
 group('migrations');
 {
-  const files = migrationFiles(); ok(files.length === 9, `nine migration files (${files.length})`);
-  const db = await freshDb(); ok(true, 'a clean database applies 01 -> 09 in order');
+  const files = migrationFiles(); ok(files.length === 10, `ten migration files (${files.length})`);
+  const db = await freshDb(); ok(true, 'a clean database applies 01 -> 10 in order');
   const t = (await db.query(`select table_name from information_schema.tables where table_schema = 'public' order by 1`)).rows.map(r => r.table_name);
   ok(['game_actions', 'game_moves', 'game_players', 'game_private', 'games', 'join_misses', 'player_racks'].every(x => t.includes(x)), 'all seven tables exist: ' + t.join(','));
   const rls = (await db.query(`select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'`)).rows;
@@ -170,6 +170,24 @@ group('Tahkim that cannot be settled: close_tahkim against real Postgres');
   ok(g.status === 'active' && g.ext.tahkim_declined === 1 && g.ext.tahkim_log.length === 1 && g.ext.tahkim_log[0].verdict === 'timeout', 'games row: active, tahkim_declined = 1, one log record with verdict timeout');
   ok(mv.length === 1 && mv[0].tahkim_status === 'ok' && mv[0].penalty === 0, 'game_moves row stays valid (ok), no penalty');
   const dup = await t.raw(mover, { action: 'close_tahkim', game_id: t.gameId, client_action_id: '55555555-5555-4555-8555-555555555555' }); ok(!dup.ok && dup.code === 'NOT_IN_TAHKIM', 'nothing left to close');
+  await t.db.close();
+}
+
+
+group('create_room limiter in SQL and through the real store (migration 10)');
+{
+  const t = await world(); const [A, B] = [t.users.A, t.users.B];
+  const hit = (keys, maxes, win = 60000) => t.sc.rpc('eas_rate_hit', { p_keys: keys, p_maxes: maxes, p_window_ms: win });
+  const r = []; for (let i = 0; i < 4; i++) r.push((await hit(['c:x:m'], [3])).data);
+  ok(r.join() === 'false,false,false,true', 'eas_rate_hit: false up to the maximum, true beyond it: ' + r.join());
+  const two = await hit(['c:y:m', 'c:n:z:m'], [5, 1]); const two2 = await hit(['c:y:m', 'c:n:z:m'], [5, 1]); ok(two.data === false && two2.data === true, 'any key over its own maximum makes the answer true');
+  await t.db.query("update public.join_misses set window_start = now() - interval '2 minutes' where key = 'c:x:m'");
+  ok((await hit(['c:x:m'], [3])).data === false, 'a key restarts after its window');
+  const denied = await as(t.db, 'authenticated', A, d => tryQ(d, "select public.eas_rate_hit(array['c:q:m'], array[1], 60000)")); ok(!!denied.error && /permission denied/i.test(denied.error), 'authenticated users cannot call it');
+  const tbl = await as(t.db, 'authenticated', A, d => tryQ(d, 'select * from public.join_misses')); ok(!!tbl.error && /permission denied/i.test(tbl.error), 'and cannot read the counters');
+  const mkCreate = () => t.raw('A', { action: 'create_room', nickname: 'A' });
+  const outcomes = []; for (let i = 0; i < 6; i++) { const x = await mkCreate(); outcomes.push(x.ok ? 'ok' : x.code); if (x.ok) await t.raw('A', { action: 'leave_room', game_id: x.snapshot.game.id, client_action_id: uuidFrom(t.rng) }); }
+  ok(outcomes.join() === 'ok,ok,ok,ok,ok,RATE_LIMITED', 'create_room through SupabaseStore: ' + outcomes.join());
   await t.db.close();
 }
 

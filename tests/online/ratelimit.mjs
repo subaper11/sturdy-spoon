@@ -53,4 +53,37 @@ group('migration 20261123000009 is server-only');
   ok(/grant execute on function public\.eas_join_blocked\(text\[\], integer\[\], integer\) to service_role/.test(sql) && /grant execute on function public\.eas_join_miss\(text\[\], integer\) to service_role/.test(sql) && !/to (anon|authenticated|public)\s*;/.test(sql.replace(/revoke[^;]*;/g, '')), 'only service_role may execute');
   ok(/on conflict \(key\) do update/.test(sql) && /delete from public\.join_misses where window_start/.test(sql) && !/drop |truncate|delete from public\.(games|game_)/i.test(sql), 'atomic upsert, retention cleanup, nothing destructive for existing data');
 }
+group('create_room limiter (v5.12): per player and per network, per minute and per hour, shared state');
+{
+  const mk = (seed, who) => makeWorld({ seed, who }), create = (w, k, extra = {}) => handleRequest(w.store, w.users[k], { action: 'create_room', nickname: 'X' }, { ...w.deps, ...extra });
+  const w = mk(21, ['A']);
+  // a player who keeps leaving and re-creating: 5 per minute, the 6th is refused
+  let res = [];
+  for (let i = 0; i < 6; i++) { const r = await create(w, 'A'); res.push(r); if (r.ok) await w.raw('A', { action: 'leave_room', game_id: r.snapshot.game.id, client_action_id: w.deps.uuid() }); }
+  ok(res.slice(0, 5).every(r => r.ok) && res[5].code === 'RATE_LIMITED', 'five creations per minute, the sixth is RATE_LIMITED: ' + res.map(r => r.ok ? 'ok' : r.code).join(','));
+  const fresh = { now: w.deps.now, rng: w.deps.rng, uuid: w.deps.uuid };   // another function instance: the counter is in the store
+  ok((await handleRequest(w.store, w.users.A, { action: 'create_room', nickname: 'X' }, fresh)).code === 'RATE_LIMITED', 'still limited from a brand-new handler context');
+  w.clock.t += 61 * SEC; const again = await create(w, 'A'); ok(again.ok, 'allowed again after the minute');
+  // the hourly ceiling: 30 per hour, spread so the minute limit never trips
+  const h = mk(22, ['B']); let made = 0, blocked = null;
+  for (let i = 0; i < 40 && !blocked; i++) { const r = await create(h, 'B'); if (r.ok) { made++; await h.raw('B', { action: 'leave_room', game_id: r.snapshot.game.id, client_action_id: h.deps.uuid() }); } else blocked = r.code; h.clock.t += 20 * SEC; }
+  ok(made === 30 && blocked === 'RATE_LIMITED', `hourly ceiling: ${made} created, then ${blocked}`);
+  // network key: three accounts on one address share a looser bucket (15/min); a different address is unaffected
+  const n = mk(23, ['A', 'B', 'C', 'D']); let okN = 0, lim = null;
+  for (let i = 0; i < 20 && !lim; i++) { const who = 'ABC'[i % 3]; const r = await create(n, who, { netKey: 'shared-net' }); if (r.ok) { okN++; await n.raw(who, { action: 'leave_room', game_id: r.snapshot.game.id, client_action_id: n.deps.uuid() }); } else lim = r.code; }
+  ok(okN === 15 && lim === 'RATE_LIMITED', `network bucket: ${okN} created, then ${lim}`);
+  ok((await create(n, 'D', { netKey: 'other-net' })).ok, 'a different network is unaffected');
+  // a player already in a game gets ALREADY_IN_GAME, not a counted attempt
+  const g = mk(24, ['A']); const first = await create(g, 'A'); for (let i = 0; i < 10; i++) { const r = await create(g, 'A'); if (r.code !== 'ALREADY_IN_GAME') { ok(false, 'unexpected ' + r.code); break; } }
+  ok(first.ok, 'returning to your own open game is never rate limited');
+  // failure fails closed
+  const f = mk(25, ['A']); f.store.rateHit = () => { throw new Error('relation "public.join_misses" does not exist'); };
+  const r = await create(f, 'A'); ok(!r.ok && r.code !== 'RATE_LIMITED' && !/join_misses|relation/.test(JSON.stringify(r)), 'store failure: refused without leaking internals (' + r.code + ')');
+}
+group('migration 20261125000010 is server-only');
+{
+  const sql = fs.readFileSync(new URL('../../supabase/migrations/20261125000010_eas_v5_12_create_rate_limit.sql', import.meta.url), 'utf8');
+  ok(/security definer set search_path = ''/.test(sql) && /revoke all on function public\.eas_rate_hit\(text\[\], integer\[\], integer\) from public, anon, authenticated/.test(sql) && /grant execute on function public\.eas_rate_hit\(text\[\], integer\[\], integer\) to service_role/.test(sql), 'security definer, empty search_path, service_role only');
+  ok(/on conflict \(key\) do update/.test(sql) && !/drop |truncate|delete from public\.(games|game_)/i.test(sql), 'atomic upsert, touches no game data');
+}
 done();

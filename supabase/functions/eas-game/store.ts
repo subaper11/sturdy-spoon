@@ -90,6 +90,10 @@ export class SupabaseStore {
     const { data, error } = await this.db.rpc('eas_join_blocked', { p_keys: keys, p_maxes: maxes, p_window_ms: windowMs });
     if (error) throw new Error(error.message); return data === true;
   }
+  async rateHit(keys: string[], maxes: number[], windowMs: number, _now: number) {   // create_room limiter (migration 20261125000010)
+    const { data, error } = await this.db.rpc('eas_rate_hit', { p_keys: keys, p_maxes: maxes, p_window_ms: windowMs });
+    if (error) throw new Error(error.message); return data === true;
+  }
   async joinMiss(keys: string[], windowMs: number, _now: number) {
     const { error } = await this.db.rpc('eas_join_miss', { p_keys: keys, p_window_ms: windowMs });
     if (error) throw new Error(error.message);
