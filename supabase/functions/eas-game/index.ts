@@ -8,6 +8,7 @@ import { handleRequest } from '../_shared/core/service.js';
 import { parseOrigins, corsFor } from '../_shared/core/cors.js';
 import { netKey } from '../_shared/core/netkey.js';
 import { readJsonLimited } from '../_shared/core/body.js';
+import { verifyAccessToken, makeKeyring } from '../_shared/core/jwt.js';
 import { SupabaseStore } from './store.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -21,6 +22,24 @@ const NET_HEADER = (Deno.env.get('TRUSTED_IP_HEADER') || 'cf-connecting-ip').toL
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const store = new SupabaseStore(db);
+
+// Access tokens are verified locally against the project's public JWKS (asymmetric signing keys): no Auth round trip per request.
+// Anything we cannot decide locally (legacy HS256 projects, an empty/unreachable JWKS, an unknown key id after one refresh) falls back to db.auth.getUser(), the old behaviour.
+// A clearly bad token (bad signature, expired, wrong issuer/audience, anon or service key) is a 401 with the same body as before.
+// Trade-off, on purpose: a deleted user's unexpired token (<= the JWT expiry, 1 h by default) still passes the signature check; every action also needs a game membership row, so it reaches nothing.
+const ISSUER = SUPABASE_URL.replace(/\/+$/, '') + '/auth/v1';
+const keyring = makeKeyring(async () => { const r = await fetch(ISSUER + '/.well-known/jwks.json', { signal: AbortSignal.timeout(3000) }); return r.ok ? (await r.json()).keys : null; });
+async function userIdOf(token: string): Promise<string | null> {
+  const now = Date.now();
+  let r: any = await verifyAccessToken(token, { keys: await keyring.get(now), now, issuer: ISSUER });
+  if (!r.ok && r.retryKeys) r = await verifyAccessToken(token, { keys: await keyring.refresh(now), now, issuer: ISSUER });
+  if (r.ok) return r.sub;
+  if (r.reason === 'kid' || r.reason === 'alg' || r.reason === 'key') {   // not decidable here
+    const { data, error } = await db.auth.getUser(token);
+    return !error && data?.user ? data.user.id : null;
+  }
+  return null;
+}
 
 const deps = {
   now: () => Date.now(),
@@ -38,11 +57,11 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: false, code: 'BAD_REQUEST', message: 'POST only.' }, 405);
   const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) return json({ ok: false, code: 'NOT_MEMBER', message: 'الجلسة منتهية. أعد تحميل الصفحة.' }, 401);
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return json({ ok: false, code: 'NOT_MEMBER', message: 'الجلسة منتهية. أعد تحميل الصفحة.' }, 401);
+  const userId = await userIdOf(token);
+  if (!userId) return json({ ok: false, code: 'NOT_MEMBER', message: 'الجلسة منتهية. أعد تحميل الصفحة.' }, 401);
   const read = await readJsonLimited(req);   // at most 16 KB, a JSON object
   if (!read.body) return json({ ok: false, code: 'BAD_REQUEST', message: read.status === 413 ? 'الطلب كبير جدًا.' : 'طلب غير صالح.' }, read.status);
   const body = read.body;
   // Domain errors are normal answers (HTTP 200 + ok:false): the browser never has to parse a platform error page.
-  return json(await handleRequest(store, data.user.id, body, { ...deps, netKey: await netKey(req.headers, NET_HEADER, NET_SALT) }));
+  return json(await handleRequest(store, userId, body, { ...deps, netKey: await netKey(req.headers, NET_HEADER, NET_SALT) }));
 });
