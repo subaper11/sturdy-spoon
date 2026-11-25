@@ -30,5 +30,5 @@ ok(corsFor(parseOrigins('*', true), 'https://anything.example').headers['Access-
 group('wiring in index.ts');
 const src = fs.readFileSync(new URL('../../supabase/functions/eas-game/index.ts', import.meta.url), 'utf8');
 ok(!/\|\|\s*'\*'/.test(src), "no default to '*' in index.ts");
-ok(src.indexOf('if (!allowed)') > 0 && src.indexOf('if (!allowed)') < src.indexOf("req.method === 'OPTIONS'") && src.indexOf("req.method === 'OPTIONS'") < src.indexOf('auth.getUser'), 'an unapproved origin is refused before OPTIONS handling, authentication and any database access');
+ok(src.indexOf('if (!allowed)') > 0 && src.indexOf('if (!allowed)') < src.indexOf("req.method === 'OPTIONS'") && src.indexOf("req.method === 'OPTIONS'") < src.indexOf('await userIdOf(token)')   /* authentication moved into userIdOf in 5.12; this is its only call site */, 'an unapproved origin is refused before OPTIONS handling, authentication and any database access');
 done();
