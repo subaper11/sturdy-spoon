@@ -147,6 +147,14 @@ ok(bLog && /aria-label="[^"]+"/.test(bLog[0]) && /<svg class="ic"/.test(bLog[1])
   ok(!/relog|ريلوج/i.test(html + pwa), 'no "Relog" wording');
 }
 
+// --- supabase-js is vendored: no CDN import at runtime, CSP does not allow one, the service worker precaches the copy
+{
+  const be = rd('js/online/supabase-backend.js'), vj = rd('vercel.json'), sw = rd('sw.js');
+  ok(/assets\/vendor\/supabase-js\.2\.49\.4\.esm\.js/.test(be) && !/https?:\/\/[^'"]*jsdelivr/.test(be), 'supabase-backend imports the same-origin vendored build');
+  ok(!/jsdelivr/.test(vj), 'CSP no longer names cdn.jsdelivr.net');
+  ok(sw.includes('"assets/vendor/supabase-js.2.49.4.esm.js"'), 'the vendored build is in PRECACHE');
+  ok(fs.existsSync(new URL('../../assets/vendor/supabase-js.2.49.4.esm.js', import.meta.url)) && /export\{[^}]*createClient/.test(rd('assets/vendor/supabase-js.2.49.4.esm.js').slice(-3000)), 'the vendored file exists and exports createClient');
+}
 // --- release consistency: APP_VERSION, README header and the newest CHANGELOG entry must name the same version
 {
   const v = /APP_VERSION = '([^']+)'/.exec(rd('js/version.js'))?.[1];

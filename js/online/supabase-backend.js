@@ -10,7 +10,8 @@
 // the technical line to show underneath it (and to paste into a bug report).
 import { ONLINE_ENV } from './env.js';
 
-export const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/+esm';
+// Same-origin copy (assets/vendor, pinned 2.49.4, MIT): no CDN at runtime, precached by the service worker. Rebuild with tools/vendor-supabase.mjs.
+export const SUPABASE_JS = new URL('../../assets/vendor/supabase-js.2.49.4.esm.js', import.meta.url).href;
 export const isConfigured = () => !!(window.EAS_BACKEND_FACTORY || (ONLINE_ENV.url && ONLINE_ENV.anonKey));
 
 // Turns a low-level failure into the sentence a person can act on. `where`: 'lib' (loading supabase-js), 'auth' (anonymous sign-in), 'fn' (the Edge Function).

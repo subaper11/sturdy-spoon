@@ -19,7 +19,7 @@
  */
 'use strict';
 
-const VERSION = '7da6881f87c8';   // stamped by tools/stamp-sw.mjs
+const VERSION = '83081f5038c4';   // stamped by tools/stamp-sw.mjs
 const PREFIX = 'arabic-scrabble-';
 const SHELL = `${PREFIX}shell-${VERSION}`;
 const RUNTIME = `${PREFIX}runtime-${VERSION}`;
@@ -28,6 +28,7 @@ const RUNTIME = `${PREFIX}runtime-${VERSION}`;
 const PRECACHE = [
   "index.html",
   "manifest.webmanifest",
+  "assets/vendor/supabase-js.2.49.4.esm.js",
   "css/themes.css",
   "css/style.css",
   "css/float.css",
