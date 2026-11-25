@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arabic Scrabble — Multiplayer Online</title>
+<meta name="description" content="لعبة سكرابل عربية لشخصين: على جهاز واحد أو عبر الإنترنت. Two-player Arabic Scrabble, local or online.">
+<!-- PWA. All URLs are relative, so the game works at a domain root and under a sub-path such as /repo/. theme-color is kept in step with the chosen theme by js/pwa.js. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2b1a10">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<!-- Two names for one thing on purpose: Chromium wants mobile-web-app-capable; iOS before 16.4 only honours the apple- one (newer iOS reads the manifest). -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Arabic Scrabble">
+<!-- "black" (opaque bar, page starts below it): legible with every theme, including the light Desert one, unlike black-translucent. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<!-- Pre-paint: reuse the saved theme id so there is no flash of the default theme. An unknown id simply matches no theme block, i.e. classic. themes.js validates it again at startup. -->
+<script>document.documentElement.classList.add('boot');try{var t=localStorage.getItem('scrabble.theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+try{var d=document.documentElement.dataset;d.hist='drawer';var l=JSON.parse(localStorage.getItem('scrabble.layout'))||{};d.bstyle=/^(iconlabel|text)$/.test(l.bstyle)?l.bstyle:'icon';d.pdock=/^(top|middle)$/.test(l.pdock)?l.pdock:'bottom';if(l.layout==='duel'){d.layout='duel';if(l.p1==='right')d.swap='true'}if(l.hist==='docked')d.hist='docked';d.binfo=l.binfo==='on'?'on':'off';if(l.tvals==='on')d.tvals='on';d.gfx=/^(mid|high)$/.test(l.gfx)?l.gfx:'low';var q=new URLSearchParams(location.search).get('lang');d.lang=/^(ar|id|en)$/.test(l.lang)?l.lang:/^(ar|id|en)$/.test(q)?q:'id'}catch(e){}</script>
+<!-- v5.10.4b: the two small Latin faces (18 KB each) are used by the first frame (clocks, scores, PLAY, ONLINE, title tiles); fetched with the CSS they are there at first layout instead of replacing the fallback one after the other. Amiri (100 KB each) is not preloaded: Arabic text is not in the first frame. -->
+<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/Tinos-Bold.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/Tinos-Regular.woff2">
+<link rel="stylesheet" href="css/themes.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/float.css">
+<link rel="stylesheet" href="css/cover.css">
+<link rel="stylesheet" href="css/pwa.css">
+<link rel="stylesheet" href="css/online.css">
+<link rel="stylesheet" href="css/overlay.css">
+<link rel="stylesheet" href="css/firstdraw.css">
+<link rel="stylesheet" href="css/tahkim.css">
+<link rel="stylesheet" href="css/gfx.css">
+<link rel="stylesheet" href="css/i18n.css">
+<link rel="stylesheet" href="css/fit.css">
+<link rel="stylesheet" href="css/bar.css">
+<link rel="stylesheet" href="css/tkpress.css">
+<link rel="stylesheet" href="css/replay.css">
+</head>
+<body class="coverOn">
+<main class="app" inert>
+<section class="boardWrap">
+<div id="board" class="board" role="grid" aria-label="لوح اللعب"></div>
+<div id="bagInfo" class="bag"></div>
+</section>
+<section class="side">
+<div id="netBar" class="netBar" hidden role="group" aria-label="مباراة عبر الإنترنت">
+<div class="mhVs" id="mhVs">
+<div class="mhP" id="mhP0" data-seat="0" role="group"><span class="mhTop"><span class="mhName"><bdi></bdi></span><span class="mhYou" aria-hidden="true">أنت</span><span class="mhDot" aria-hidden="true"></span></span><span class="mhBot"><b class="mhScore" aria-label="النقاط">0</b><span class="mhClock" role="timer" aria-label="الوقت المتبقي">25:00</span></span></div>
+<span class="mhVsMark" aria-hidden="true">VS</span>
+<div class="mhP" id="mhP1" data-seat="1" role="group"><span class="mhTop"><span class="mhName"><bdi></bdi></span><span class="mhYou" aria-hidden="true">أنت</span><span class="mhDot" aria-hidden="true"></span></span><span class="mhBot"><b class="mhScore" aria-label="النقاط">0</b><span class="mhClock" role="timer" aria-label="الوقت المتبقي">25:00</span></span></div>
+</div>
+<div class="mhInfo" id="mhInfo"><span id="netGrip" class="netGrip" aria-label="تحريك الشريط"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></span><span id="netDot" class="netDot" aria-hidden="true"></span><button type="button" id="netRoom" class="netRoom" title="رمز الغرفة — انقر للنسخ" aria-label="رمز الغرفة، انقر للنسخ" dir="ltr"></button><span id="netState" class="netState" role="status" aria-live="polite"></span><button type="button" class="btn" id="netPause" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="lbl">إيقاف مؤقت</span><span class="bagBadge" id="netPauseN" aria-hidden="true"></span></button><button type="button" class="btn" id="netClaim" hidden disabled></button><button type="button" class="btn yes" id="netRematch" hidden>إعادة المباراة</button><button type="button" class="btn danger" id="netLeave"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4M6 5h11l-2.5 3.5L17 12H6"/></svg><span class="lbl">استسلام</span></button></div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<!-- v5.10.4: the two player panels and their 7-slot racks are in the HTML, so nothing is inserted (and the dock does not jump) when js/ui.js runs; buildDom() fills them in and keeps this markup byte-for-byte what it would have built. -->
+<div class="players" id="players"><div class="panel" id="pn0"><div class="phead"><span class="pname" tabindex="0" role="button"><bdi>​</bdi></span><span class="ptime" id="t0">25:00</span><span class="pscore" id="sc0">0</span></div><div class="rack" id="rk0"><div class="slot" data-p="0" data-i="0"></div><div class="slot" data-p="0" data-i="1"></div><div class="slot" data-p="0" data-i="2"></div><div class="slot" data-p="0" data-i="3"></div><div class="slot" data-p="0" data-i="4"></div><div class="slot" data-p="0" data-i="5"></div><div class="slot" data-p="0" data-i="6"></div></div></div><div class="panel" id="pn1"><div class="phead"><span class="pname" tabindex="0" role="button"><bdi>​</bdi></span><span class="ptime" id="t1">25:00</span><span class="pscore" id="sc1">0</span></div><div class="rack" id="rk1"><div class="slot" data-p="1" data-i="0"></div><div class="slot" data-p="1" data-i="1"></div><div class="slot" data-p="1" data-i="2"></div><div class="slot" data-p="1" data-i="3"></div><div class="slot" data-p="1" data-i="4"></div><div class="slot" data-p="1" data-i="5"></div><div class="slot" data-p="1" data-i="6"></div></div></div></div>
+<div class="ctrls" id="ctrls" data-st="idle" data-p="0">
+<div class="dockMain" id="dockMain">
+<button class="btn main" id="bSubmit" aria-label="احتساب"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="lbl">احتساب</span><b class="pts" id="bPts" hidden></b></button>
+<button class="btn" id="bCancel"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span class="lbl">إلغاء الحركة</span></button>
+<button class="btn" id="bSwap"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/></svg><span class="lbl">تبديل القطع</span><span class="bagBadge" id="bagBadge" aria-hidden="true"></span><span class="vh" id="bagSr"></span></button>
+<button class="btn" id="bPass"><svg class="ic flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l9 7-9 7zM18 5v14"/></svg><span class="lbl">تمرير الدور</span></button>
+<button class="btn" id="bUndo"><svg class="ic flip" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/></svg><span class="lbl">تراجع</span></button>
+</div>
+<div class="dockTools" id="toolRow">
+<button class="btn" id="bReplay" hidden data-replay aria-label="إعادة اللعبة" title="إعادة اللعبة"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8M3 3v5h5M10 8.5v7l6-3.5z"/></svg><span class="lbl">إعادة اللعبة</span></button>
+<button type="button" class="btn wide" id="bLog" aria-controls="hist" aria-expanded="false" aria-label="سجل الكلمات" title="سجل الكلمات"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h12M4 12h12M4 18h12M20 6h.01M20 12h.01M20 18h.01"/></svg><span class="lbl">سجل الكلمات</span></button>
+<button type="button" class="btn wide" id="bPause" aria-label="إيقاف مؤقت" title="إيقاف مؤقت (P)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="lbl">إيقاف مؤقت</span></button>
+<button type="button" class="btn wide" id="bFs" aria-pressed="false" aria-label="ملء الشاشة" title="ملء الشاشة"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span class="lbl">ملء الشاشة</span></button>
+<button class="btn wide" id="bSettings"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span class="lbl">الإعدادات</span></button>
+<button class="btn danger" id="bNew"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">لعبة جديدة</span></button>
+</div>
+<!-- Tahkim is started by pressing and holding the opponent's word (js/tkpress.js); this hidden button only keeps the one rule for whether a challenge is allowed -->
+<button hidden class="btn wide" id="bJudge"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14M5 8l-3 7a3 3 0 006 0zM19 8l-3 7a3 3 0 006 0z"/></svg><span class="lbl">تحكيم</span></button>
+</div>
+<div class="tools" id="tools" role="group" aria-label="أدوات اللعبة"></div>
+</section>
+<aside class="hist" id="hist" aria-label="سجل الكلمات"><button type="button" class="histToggle" id="hToggle" aria-controls="hList" aria-expanded="true">إخفاء السجل</button><h2>سجل الكلمات</h2>
+<div class="hTabs" id="hTabs" role="tablist" aria-label="أقسام السجل" hidden>
+<button type="button" role="tab" class="hTab" id="hTabW" data-t="words" aria-controls="hPaneW" aria-selected="true"><span>الكلمات</span></button>
+<button type="button" role="tab" class="hTab" id="hTabC" data-t="chat" aria-controls="hPaneC" aria-selected="false"><span>الدردشة</span><b class="hBadge" id="hBadgeC" hidden></b></button>
+<button type="button" role="tab" class="hTab" id="hTabT" data-t="tahkim" aria-controls="hPaneT" aria-selected="false"><span>التحكيم</span><b class="hBadge urgent" id="hBadgeT" hidden></b></button>
+</div>
+<div class="hPane" id="hPaneW" role="tabpanel" aria-labelledby="hTabW"><p class="hbag" id="hBag"></p><ol class="hl" id="hList"></ol><p class="hbest" id="hBest"></p></div>
+<div class="hPane" id="hPaneC" role="tabpanel" aria-labelledby="hTabC" hidden>
+<div class="chTop"><span class="chNote">محادثة المباراة · منفصلة عن التحكيم</span><button type="button" class="btn chMute" id="chMute" aria-pressed="false" title="كتم إشعارات الرسائل"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17h12l-1.5-2V10a4.5 4.5 0 00-9 0v5zM10 20h4"/><path class="chSlash" d="M4 4l16 16"/></svg><span class="lbl">كتم</span></button></div>
+<ol class="chLog" id="chLog" role="log" aria-live="off" aria-label="رسائل المباراة"></ol>
+<div class="chQuick" id="chQuick" role="group" aria-label="ردود سريعة"></div>
+<form class="chForm" id="chForm" autocomplete="off"><label class="vh" for="chText">رسالة</label><textarea id="chText" rows="1" maxlength="200" placeholder="اكتب رسالة…" enterkeyhint="send"></textarea><button type="submit" class="btn main" id="chSend">إرسال</button></form>
+</div>
+<div class="hPane" id="hPaneT" role="tabpanel" aria-labelledby="hTabT" hidden><p class="hempty" id="hTkE">لا توجد قرارات تحكيم بعد.</p><details class="hTk" id="hTk" hidden open><summary>سجل التحكيم</summary><ol class="hTkL" id="hTkL"></ol></details></div>
+</aside>
+</main>
+<dialog id="dlg" aria-labelledby="dT"><h2 id="dT" tabindex="-1" autofocus></h2><div id="dM"></div><form method="dialog" id="dF"></form></dialog>
+<dialog id="md" aria-labelledby="mT"><h2 id="mT" tabindex="-1" autofocus>اختر نمط الحروف</h2><form method="dialog" id="mf"></form><form method="dialog" class="dlgRow"><button class="btn" id="mCancel" value="">إلغاء</button></form></dialog>
+<dialog id="sd" aria-labelledby="sT"><h2 id="sT" tabindex="-1" autofocus>مدة اللعبة</h2><p>الوقت لكل لاعب — تبدأ الساعة بعد أول حركة.</p><form method="dialog" id="sf"></form><form method="dialog" class="dlgRow"><button class="btn" value="back">رجوع</button></form></dialog>
+<dialog id="bd" aria-labelledby="bT"><h2 id="bT" tabindex="-1" autofocus>اختر الحرف</h2><form method="dialog" id="bf"></form><form method="dialog" class="dlgRow"><button class="btn" value="">إلغاء</button></form></dialog>
+<dialog id="jd" aria-labelledby="jT"><h2 id="jT" tabindex="-1" autofocus></h2><div id="jB"></div></dialog>
+<dialog id="rd" class="rulesDlg" aria-labelledby="rdT">
+<header class="rdHead"><h2 id="rdT" tabindex="-1">كيف تلعب</h2><button type="button" class="btn fClose" id="rdClose" aria-label="إغلاق" title="إغلاق"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+<div class="rdTabs" id="rdTabs" role="tablist" aria-label="أقسام القواعد"></div>
+<div class="rdBody" id="rdBody" role="tabpanel" tabindex="0"></div>
+</dialog>
+<dialog id="ad" aria-labelledby="aT">
+<div class="fHead"><h2 id="aT" tabindex="-1">الإعدادات</h2>
+<button type="button" class="btn setHome" id="goHome" aria-label="العودة إلى الشاشة الرئيسية" title="العودة إلى الشاشة الرئيسية"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="lbl">الشاشة الرئيسية</span></button>
+<button type="button" class="btn fClose" id="aClose" aria-label="إغلاق" title="إغلاق"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="setPanel">
+<section class="setSec setPri" aria-labelledby="setEssT">
+<h3 class="setG" id="setEssT">الإعدادات الأساسية</h3>
+<div id="lyFloat" class="setList"></div>
+<button type="button" class="swRow" id="fsSet" role="switch" aria-checked="false" aria-label="ملء الشاشة" title="ملء الشاشة"><span class="setTx"><span class="setT lbl">ملء الشاشة</span></span><span class="swTrack" aria-hidden="true"><i></i></span></button>
+<p id="fsTip" class="setNote" data-i18n="i18n.fsTip" hidden>لملء الشاشة على <span class="en">iPhone</span>: من زر المشاركة اختر «إضافة إلى الشاشة الرئيسية» ثم افتح اللعبة من أيقونتها.</p>
+<div id="lyLang" class="setList"></div>
+<button type="button" class="btn ghost" id="flReset">إعادة ضبط العناصر العائمة</button>
+</section>
+<section class="setSec" aria-labelledby="setGameT">
+<h3 class="setG" id="setGameT">المباراة</h3>
+<div id="fdB" class="setList"></div>
+<div id="rkB" class="setList"></div>
+<div id="lvB" class="setList"></div>
+<div id="hpSec" hidden><div id="hpB" class="setList"></div></div>
+<div id="psSec"><button type="button" class="actRow" id="pauseNow"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg><span class="setTx"><span class="setT">إيقاف مؤقت الآن</span><span class="setD">تتوقف الساعتان ويُخفى اللوح حتى الاستئناف (المفتاح P).</span></span></button></div>
+</section>
+<section class="setSec" aria-labelledby="setLookT">
+<h3 class="setG" id="setLookT">المظهر والتخطيط</h3>
+<div class="thGrid" id="thB" role="group" aria-label="المظهر"></div>
+<div id="lyView" class="setList"></div>
+<div id="nmB" class="setList nmList"></div>
+</section>
+<section class="setSec" aria-labelledby="setHelpT">
+<h3 class="setG" id="setHelpT">المساعدة</h3>
+<a class="actRow" id="guideLink" href="https://arscguide.vercel.app/" target="_blank" rel="noopener noreferrer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h10M9 8h5"/></svg><span class="setTx"><span class="setT">الدليل والقواعد</span><span class="setD">تعرّف على طريقة اللعب والقواعد ونظام اللعبة.</span></span><svg class="ic ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg><span class="sr">(يفتح في نافذة جديدة)</span></a>
+<details class="setMore" id="setMore">
+<summary>خيارات إضافية <small>(اختيارية)</small></summary>
+<div class="setMoreB">
+<h4 class="setH">التطبيق</h4>
+<div class="pwaBox">
+<p id="pwaStatus" class="pwaStatus" role="status"></p>
+<button class="btn main" id="pwaInstall" type="button" hidden>تثبيت التطبيق</button>
+<p id="pwaHint" class="pwaStatus" hidden></p>
+<a class="btn" id="pwaCheck" href="pwa-check.html">فحص التثبيت والاتصال</a>
+</div>
+</div>
+</details>
+</section>
+</div>
+</dialog>
+<!-- v5.10.4b: the landing screen is part of the first paint (it used to be un-hidden by js/cover.js at the end of start-up, so the unfinished game showed first). The game area is inert and sits behind it until js/cover.js hands it over. -->
+<section id="cover" class="cover" aria-label="Arabic Scrabble Multiplayer Online">
+<div class="coverInner">
+<div id="coverTitle" class="coverTitle" role="img" aria-label="Arabic Scrabble"><span class="cw" aria-hidden="true"><span class="cl" data-v="1" style="--i:0">A</span><span class="cl" data-v="1" style="--i:1">R</span><span class="cl" data-v="1" style="--i:2">A</span><span class="cl" data-v="3" style="--i:3">B</span><span class="cl" data-v="1" style="--i:4">I</span><span class="cl" data-v="3" style="--i:5">C</span></span><span class="cw" aria-hidden="true"><span class="cl" data-v="1" style="--i:6">S</span><span class="cl" data-v="3" style="--i:7">C</span><span class="cl" data-v="1" style="--i:8">R</span><span class="cl" data-v="1" style="--i:9">A</span><span class="cl" data-v="3" style="--i:10">B</span><span class="cl" data-v="3" style="--i:11">B</span><span class="cl" data-v="1" style="--i:12">L</span><span class="cl" data-v="1" style="--i:13">E</span></span></div>
+<p class="coverSub">MULTIPLAYER ONLINE</p>
+<nav class="coverMenu" aria-label="طريقة اللعب">
+<button id="coverPlay" class="coverPlay" type="button"><span class="cbT">PLAY</span><small>لعب محلي · جهاز واحد</small></button>
+<button id="coverOnline" class="coverOnline" type="button"><span class="cbT">ONLINE</span><small>اللعب عبر الإنترنت</small></button>
+</nav>
+<a id="coverDonate" class="donBtn" href="https://saweria.co/esbepe83" target="_blank" rel="noopener noreferrer" title="إن أعجبتك اللعبة فادعم تطويرها بتبرّع اختياري"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0112 7.6a4.3 4.3 0 017.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg><span>ادعم تطوير اللعبة</span><span lang="id" dir="ltr" class="donId">Donasi</span><span class="sr">(يفتح في نافذة جديدة)</span></a>
+<p class="coverBy">by esbepe</p>
+</div>
+<div id="pwaBar" class="pwaBar" role="region" aria-label="تثبيت التطبيق" hidden>
+<p id="pwaBarText"></p>
+<button type="button" class="btn main" id="pwaBarGo"></button>
+<button type="button" class="btn pwaX" id="pwaBarX" aria-label="إخفاء الاقتراح" title="إخفاء الاقتراح"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
+</section>
+<div id="pwaUpdate" class="pwaUpdate" role="status" hidden>
+<div class="puTx"><b class="puT">إصدار جديد متاح</b><span class="puD">أحدث نسخة من اللعبة جاهزة. أعد تحميل التطبيق لتطبيق التحديث.</span></div>
+<button type="button" class="btn main" id="pwaUpdateGo">إعادة التحميل</button>
+</div>
+<div id="mOv" class="mOv" hidden><div class="mOvCard" role="alertdialog" aria-modal="true" aria-labelledby="mOvT" aria-describedby="mOvB" tabindex="-1"><div class="mOvIc" id="mOvIc" aria-hidden="true"></div><h2 id="mOvT"></h2><div id="mOvB"></div><div class="mOvTime" id="mOvTime" hidden></div><div class="mOvAct" id="mOvAct"></div></div></div>
+<dialog id="pd" aria-labelledby="pdT">
+<h2 id="pdT" tabindex="-1" data-i18n="i18n.pdT" autofocus>تثبيت اللعبة على <span class="en">iPhone</span> و<span class="en">iPad</span></h2>
+<ol class="pwaSteps">
+<li data-i18n="i18n.s1">افتح هذه الصفحة في <span class="en"><b>Safari</b></span>.</li>
+<li data-i18n="i18n.s2">اضغط زر <b>مشاركة</b> <span class="en">(Share)</span>: مربع يخرج منه سهم لأعلى. في <span class="en">iPhone</span> يكون في الشريط السفلي، وفي <span class="en">iPad</span> في أعلى الشاشة، وقد يظهر ضمن قائمة «⋯».</li>
+<li data-i18n="i18n.s3">مرّر القائمة واختر <b>إضافة إلى الشاشة الرئيسية</b> <span class="en">(Add to Home Screen)</span>. إن لم تظهر فاختر «عرض المزيد» <span class="en">(View More)</span> أولًا.</li>
+<li data-i18n="i18n.s4">إن ظهر خيار <b>فتح كتطبيق ويب</b> <span class="en">(Open as Web App)</span> فاتركه مفعّلًا لتُفتح اللعبة بملء الشاشة.</li>
+<li data-i18n="i18n.s5">اضغط <b>إضافة</b> <span class="en">(Add)</span>، ثم افتح اللعبة من الأيقونة الجديدة.</li>
+</ol>
+<p class="pwaNote" data-i18n="i18n.pwaNote">قد تختلف أسماء الخيارات قليلًا بحسب لغة النظام وإصداره. لا يعرض <span class="en">iOS</span> رسالة تثبيت تلقائية، والتطبيق المثبّت يحتفظ بإعدادات ومباراة محفوظة منفصلة عن <span class="en">Safari</span>. تعمل اللعبة دون إنترنت بعد تحميلها مرة واحدة بنجاح.</p>
+<form method="dialog" class="dlgRow"><button class="btn main" value="">حسنًا</button></form>
+</dialog>
+<section id="lobby" class="lobby" aria-label="اللعب عبر الإنترنت" hidden></section>
+<!-- v5.10.4: first-paint fit. js/fit.js (loaded below) scales the panels, gaps and dock to the screen once it runs; doing the same sum here, while the page is still being parsed,
+     means the first frame already has its final size and nothing moves when the module arrives. Same rules as js/fit.js and js/scale.js (and the landing screen's labels, translated here so they are in the first frame: the late appearance of the donate label was the LCP element, ~4 s) (tests/layout/fit-prepaint.mjs asserts that both give the same --fill and --ui). -->
+<script>(function(){try{var r=document.documentElement,a=document.querySelector('.app'),b=document.getElementById('board'),m=matchMedia,f=1.5,w=0,d=r.dataset;var T={id:['Main lokal \u00b7 satu perangkat','Main online','Dukung pengembangan game','(dibuka di jendela baru)','Jika suka game ini, dukung pengembangannya lewat donasi sukarela'],en:['Local play \u00b7 one device','Play online','Support the game','(opens in a new window)','If you enjoy the game, support its development with an optional donation']}[d.lang],q=function(s){return document.querySelector(s)};
+if(T&&q('#coverPlay small')){q('#coverPlay small').textContent=T[0];q('#coverOnline small').textContent=T[1];q('#coverDonate>span:not(.donId):not(.sr)').textContent=T[2];q('#coverDonate .sr').textContent=T[3];q('#coverDonate').title=T[4]}   // the landing screen's few labels, in the chosen language from the first frame (js/i18n-ui.js has the same strings; the static test compares them)
+if(!a||!b||d.fit)return;
+w=b.getBoundingClientRect().width;if(w>0)r.style.setProperty('--ui',Math.min(1.2,Math.max(.85,w/720)).toFixed(3));w=0;   // js/scale.js: the text size that follows the board's width
+try{var s=JSON.parse(localStorage.getItem('scrabble.floatWorkspace.v2'));w=!!(s&&s.v===2&&s.enabled===true)}catch(e){}
+if(w||d.layout==='duel')return;
+if(m('(min-width: 1000px) and (min-height: 560px)').matches){d.fit='wide';r.style.setProperty('--fill',Math.max(1,Math.min(f,(innerHeight-97)/700)).toFixed(3));return}
+if(!m('(max-width: 999px) and (orientation: portrait)').matches)return;
+var pb=parseFloat(getComputedStyle(document.body).paddingBottom)||0,ok=function(v){r.style.setProperty('--fill',v.toFixed(3));return a.offsetTop+a.offsetHeight+pb<=innerHeight-1},lo=1,hi=f;d.fit='portrait';
+if(ok(hi))lo=hi;else{for(var i=0;i<7;i++){var mid=(lo+hi)/2;if(ok(mid))lo=mid;else hi=mid}}
+if(lo===1&&!ok(1)){delete d.fit;r.style.removeProperty('--fill');return}
+r.style.setProperty('--fill',lo.toFixed(3))}catch(e){}finally{document.documentElement.setAttribute('data-pp','')}})()</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

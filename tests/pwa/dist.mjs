@@ -1,0 +1,23 @@
+// The production artefact (tools/build-dist.mjs): one stylesheet in the original cascade order, a valid offline precache list, nothing missing, sources untouched.
+import fs from 'fs'; import path from 'path'; import os from 'os'; import { execFileSync } from 'child_process'; import crypto from 'crypto';
+const root = path.resolve(import.meta.dirname, '../..'), out = fs.mkdtempSync(path.join(os.tmpdir(), 'eas-dist-'));
+let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; console.log('  FAIL:', m); } };
+const hashTree = d => { const h = crypto.createHash('sha256'); (function w(p) { for (const f of fs.readdirSync(p).sort()) { const q = path.join(p, f); fs.statSync(q).isDirectory() ? w(q) : h.update(q + fs.readFileSync(q)); } })(d); return h.digest('hex'); };
+const before = ['css', 'js', 'index.html', 'sw.js'].map(p => fs.statSync(path.join(root, p)).isDirectory() ? hashTree(path.join(root, p)) : crypto.createHash('sha256').update(fs.readFileSync(path.join(root, p))).digest('hex')).join();
+execFileSync('node', [path.join(root, 'tools/build-dist.mjs')], { env: { ...process.env, EAS_DIST: path.relative(root, out) }, stdio: 'pipe' });
+const D = p => path.join(out, p), html = fs.readFileSync(D('index.html'), 'utf8'), src = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const srcSheets = [...src.matchAll(/<link rel="stylesheet" href="(css\/[a-z0-9-]+\.css)">/g)].map(m => m[1]);
+ok(srcSheets.length >= 10, `source index.html has ${srcSheets.length} stylesheets`);
+ok([...html.matchAll(/rel="stylesheet"/g)].length === 1 && html.includes('href="css/app.css"'), 'dist index.html has exactly one stylesheet: css/app.css');
+ok(fs.readFileSync(D('css/app.css'), 'utf8') === srcSheets.map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n'), 'app.css is the sources concatenated in the original link order (cascade unchanged)');
+ok(!/@import/.test(fs.readFileSync(D('css/app.css'), 'utf8')), 'no @import left in app.css');
+const refs = [...html.matchAll(/(?:href|src)="((?:css|js|assets)\/[^"]+)"/g)].map(m => m[1]); ok(refs.length > 5 && refs.every(r => fs.existsSync(D(r))), `every file index.html references exists in dist (${refs.length})`);
+const sw = fs.readFileSync(D('sw.js'), 'utf8'), list = new Function('return ' + /const PRECACHE = (\[[\s\S]*?\]);/.exec(sw)[1])();
+ok(list.includes('css/app.css') && list.includes('index.html'), 'dist precache contains index.html and css/app.css (offline start does not need a runtime fetch)');
+ok(list.every(p => fs.existsSync(D(p))), 'every precache entry exists in dist (a missing one would fail the whole SW install)');
+ok(!srcSheets.some(f => list.includes(f) && !fs.readFileSync(D('pwa-check.html'), 'utf8').includes(f)), 'sheets no longer used are not downloaded on install');
+const files = []; (function w(p) { for (const f of fs.readdirSync(p)) { const q = path.join(p, f); fs.statSync(q).isDirectory() ? w(q) : files.push(path.relative(out, q).split(path.sep).join('/')); } })(out);
+const need = ['js/main.js', 'manifest.webmanifest', 'sw.js', 'index.html']; ok(need.every(f => files.includes(f)) && !files.some(f => /^(supabase|tests|docs|tools)\//.test(f)), 'dist has the app and none of supabase/tests/docs/tools');
+const after = ['css', 'js', 'index.html', 'sw.js'].map(p => fs.statSync(path.join(root, p)).isDirectory() ? hashTree(path.join(root, p)) : crypto.createHash('sha256').update(fs.readFileSync(path.join(root, p))).digest('hex')).join();
+ok(before === after, 'building dist leaves the source files untouched');
+fs.rmSync(out, { recursive: true, force: true }); console.log(`${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

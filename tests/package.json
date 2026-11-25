@@ -1,0 +1,28 @@
+{
+  "name": "eas-online-tests",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only test environment for EAS Online. The game itself has no dependencies.",
+  "engines": {
+    "node": ">=22.7"
+  },
+  "scripts": {
+    "setup:browser": "playwright-core install chromium",
+    "test": "node run-all.mjs",
+    "test:unit": "node run-all.mjs --group unit",
+    "test:server": "node run-all.mjs --group server",
+    "test:db": "node run-all.mjs --group db",
+    "test:e2e": "node run-all.mjs --group e2e",
+    "test:layout": "node run-all.mjs --group layout",
+    "test:pwa": "node run-all.mjs --group pwa",
+    "test:a11y": "node run-all.mjs --group a11y"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.16",
+    "@sparticuz/chromium": "153.0.0",
+    "jsdom": "31.0.1",
+    "playwright-core": "1.63.0",
+    "pngjs": "7.0.0",
+    "puppeteer-core": "25.18.1"
+  }
+}

@@ -1,0 +1,14 @@
+/* Adaptive fit (js/fit.js sets data-fit and --fill). Without data-fit nothing here applies, so the other layouts are exactly as before. */
+html[data-fit] .app{--kd:calc(1 + (var(--fill,1) - 1)*.6);--ui:calc(1 + (var(--fill,1) - 1)*.55);gap:calc(10px*var(--fill,1))}
+html[data-fit] .side{gap:calc(10px*var(--fill,1))}html[data-fit] .players{gap:calc(8px*var(--fill,1))}
+@media(max-width:420px){html[data-fit] .app,html[data-fit] .side{gap:calc(8px*var(--fill,1))}}   /* the narrow-phone gaps of style.css, scaled */
+html[data-fit] .panel{padding:calc(8px*var(--fill,1)) calc(10px*var(--fill,1))}
+html[data-fit] .phead{margin-bottom:calc(6px*var(--fill,1))}
+/* portrait: the rack cannot get wider than the screen, so its tiles grow taller (up to +30%) and what is still free is split above and below */
+html[data-fit="portrait"]{--tall:calc(1 + (var(--fill,1) - 1)*.6)}
+html[data-fit="portrait"] .slot{aspect-ratio:calc(1/var(--tall,1))}
+html[data-fit="portrait"] body{display:flex;flex-direction:column}
+html[data-fit="portrait"] .app{margin-block:auto;width:100%}
+/* wide: the column beside the board grows with the screen and sits in the middle of the board's height */
+html[data-fit="wide"] .rack{max-width:calc(440px*var(--fill,1))}
+html[data-fit="wide"] .side{align-self:center}
