@@ -147,4 +147,15 @@ ok(bLog && /aria-label="[^"]+"/.test(bLog[0]) && /<svg class="ic"/.test(bLog[1])
   ok(!/relog|ريلوج/i.test(html + pwa), 'no "Relog" wording');
 }
 
+// --- release consistency: APP_VERSION, README header and the newest CHANGELOG entry must name the same version
+{
+  const v = /APP_VERSION = '([^']+)'/.exec(rd('js/version.js'))?.[1];
+  const readme = /\*\*Version (\d+\.\d+\.\d+)/.exec(rd('README.md'))?.[1];
+  const changelog = /^## (\d+\.\d+\.\d+)/m.exec(rd('CHANGELOG.md'))?.[1];
+  ok(v && /^\d+\.\d+\.\d+$/.test(v), `APP_VERSION is x.y.z (got ${v})`);
+  ok(readme === v, `README header version (${readme}) equals APP_VERSION (${v})`);
+  ok(changelog === v, `newest CHANGELOG entry (${changelog}) equals APP_VERSION (${v})`);
+  ok(/APP_VERSION/.test(rd('pwa-check.html')) && !/5\.\d+\.\d+/.test(/APP_VERSION[^\n]*/.exec(rd('pwa-check.html'))[0]), 'pwa-check.html reads the version from js/version.js, no hard-coded copy');
+}
+
 console.log(`${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

@@ -12,9 +12,9 @@ const N = (g, f, ...a) => ({ g, cmd: 'node', args: [...(f.startsWith('!') ? TS :
 const SUITES = [
   N('unit', '../tools/sync-edge-shared.mjs', '--check'),
   ...['logic/engine.mjs', 'logic/endgame.mjs', 'logic/startup.mjs', 'logic/names.mjs', 'logic/dropgeom.mjs'].map(f => N('unit', f)),
-  ...['rooms', 'game', 'security', 'network', 'endgame', 'abandon', 'pause-undo', 'parity', 'tahkim-reason', 'draft', 'explain', 'first-draw', 'env-build', 'hardening', 'tahkim-consensus'].map(f => N('server', `online/${f}.mjs`)),
+  ...['rooms', 'game', 'security', 'network', 'endgame', 'abandon', 'pause-undo', 'parity', 'tahkim-reason', 'draft', 'explain', 'first-draw', 'env-build', 'hardening', 'tahkim-consensus', 'cors', 'body', 'ratelimit', 'chat', 'adaptive'].map(f => N('server', `online/${f}.mjs`)),
   N('server', '!online/heartbeat.mjs'),
-  N('db', '!db/postgres.mjs'),   // real Postgres (PGlite): all migrations, the real SupabaseStore, RLS as the API roles see it N('server', 'online/cors.mjs'), N('server', 'online/body.mjs'), N('server', 'online/ratelimit.mjs'),
+  N('db', '!db/postgres.mjs'),   // real Postgres (PGlite): all migrations, the real SupabaseStore, RLS as the API roles see it
   ...['local', 'tahkim-replay', 'fit', 'pause-button', 'run'].map(f => P('e2e', `e2e/${f}.py`)),
   P('a11y', 'contrast.py'),
   N('layout', 'layout/history-toggle.mjs'), N('layout', 'layout/history-toggle-extra.mjs', 'a'), N('layout', 'layout/history-toggle-extra.mjs', 'b'), N('layout', 'layout/log-icon.mjs'), N('layout', 'layout/floating.mjs'), P('layout', 'layout/float_modules.py'),

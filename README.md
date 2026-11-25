@@ -1,16 +1,34 @@
 # Arabic Scrabble Multiplayer Online
 
-> **v5.11.1 RC (release candidate).** Hardening of v5.11.0: heartbeat error handling, reproducible tests, shared room-code rate limiting, fail-closed CORS, request-size limit, faster first load, stable Arabic layout. It stays an RC until the release gates in `docs/V5_11_1_HARDENING_REPORT.md` (section 10) have passed. Deploy in the order given in `docs/DEPLOYMENT.md`.
+**Version 5.11.1** (release candidate; see `CHANGELOG.md`).
+
+## Summary
 
 > **New to deploying?** Read `docs/DEPLOY_STEPS.md` first: three pieces (GitHub, Vercel, Supabase), how to update, a five-minute check and a table of common problems.
-
 A two-player, local Arabic Scrabble game that runs entirely in the browser.
-
 This project evolved from the original repository, [DAXEI08/update-version](https://github.com/DAXEI08/update-version), and merges its two Arabic tile-set variants into one shared game engine, with a selectable visual theme system on top.
-
 > **One game engine, one ruleset, two tile sets, multiple visual themes.**
 
-## Online play (Supabase)
+## Quick start
+
+### Local (no server)
+
+ES modules need to be served over HTTP (opening `index.html` from `file://` is blocked by browsers). From the project folder:
+
+```sh
+python3 -m http.server 8000
+```
+
+then open <http://localhost:8000>. Any static host (GitHub Pages, Netlify, …) works as-is.
+
+
+### Online (Supabase)
+
+Online play needs a Supabase project, the `eas-game` Edge Function and the migrations. Step by step: `docs/DEPLOY_STEPS.md`; canonical order: `docs/DEPLOYMENT.md`; from zero: `docs/ONLINE_MULTIPLAYER_SETUP.md`.
+
+## Features
+
+### Online play (Supabase)
 
 Two players on two devices can play the same match: **ONLINE** on the cover → nickname → create a room (a 6-character code and a share link) or join with a code. The server (a Supabase Edge Function plus Postgres) is the referee: it deals the tiles, checks legality, scores, keeps the clock and settles the end; the page only draws what the server says and sends requests. Local play is unchanged and never loads the online code.
 
@@ -21,42 +39,17 @@ Two players on two devices can play the same match: **ONLINE** on the cover → 
 - **Disconnections:** a heartbeat every 20 s keeps the server informed. If the player the match is waiting for stays silent for 5 minutes, the other player gets a countdown and then a button to end the match in their favour (the server re-checks).
 - **Setup:** `docs/ONLINE_MULTIPLAYER_SETUP.md` (from zero) and `docs/ONLINE_ARCHITECTURE.md` (design, state split, security). The nine SQL migrations in `supabase/migrations` create everything (inventory: `docs/MIGRATIONS.md`; deployment order: `docs/DEPLOYMENT.md`). **v5.4** (see `docs/V5_4_BUILD_REPORT.md`): surrender rule (the player who resigns drops to 0 and the other wins), expired clocks cannot be frozen, Tahkim requests lapse by themselves, the bag is reshuffled after an undo / voided move, room-code guessing is rate-limited, and the site is published from `dist/` with security headers.
 
-## Support link
-The start screen has a quiet *ادعم تطوير اللعبة / Dukung pengembangan game ini* section with a button to https://saweria.co/esbepe83 (opens in a new tab with `rel="noopener noreferrer"`, so the game is never left). Markup in `index.html` (`#coverDonate`), styles in `css/cover.css` (compact on short screens; the cover scrolls instead of clipping on very small ones).
-
-## Who starts
+### Who starts
 Each player draws one tile and the higher value starts (a blank counts 0, a tie is drawn again), like a real game. Online the server draws and both screens play the same draw (a rematch draws again); locally each player taps their own tile (Settings → بداية المباراة can turn it off). See `js/firstdraw.js`, `engine.js` (`drawFirst`) and `docs/V5_2_BUILD_REPORT.md`.
 
-## v5.2 (on top of v5.1): unlimited local undo, pause cards, rack display, a live preview that works
-- **Undo, local play**: every action (move, pass, swap) can be taken back, as many times in a row as you like, back to the start; board, racks, bag, scores, clocks and turn return, and the history shrinks with it. The history is saved with the match (up to 300 steps). *تحكيم* is only enabled on a fresh, unruled move.
-- **Undo, online**: still a request. The opponent now gets a **full-screen card** (accept / decline) that does not depend on any other dialog, plus the status line; the requester sees "waiting for approval" and can withdraw.
-- **Pause**: a **full-screen card** on both screens (who paused, a running or counting-down time, resume button; the board and racks are hidden and the game behind is inert). Online: 2 pauses each, 3 minutes, the other player's resume button counts down. **Local**: press either clock (or the **P** key, or Settings → الإيقاف المؤقت); no limits, the time spent paused is never charged.
-- **Racks, local play** (Settings → الرفوف): *always visible* (as before) or *visible only on the owner's turn* (the other rack shows card backs; no letters are in the page).
-- **Live preview** now travels in **presence** (the channel members are already authorised for), not in client broadcasts, so it needs no extra database permission (migration 06 removes the permission early copies of 05 granted). Each device also tells the other which **revision** it has seen, so a missed realtime event heals itself, and which **game version** it runs: a mismatch (typically one device on a stale cached copy) is announced and undo / pause are not sent to a device that cannot show them. Settings → المعاينة المباشرة is a personal on/off switch on top of the host's room rule.
-
-## v5.1: pause, undo with approval, live preview, word rules, diagnostics
-- **Undo with the opponent's approval** (online). The player who has just moved can press *Undo* to ask; the other player gets Accept / Decline. Accepting restores board, racks, bag and scores and gives the turn back (clocks are kept; the responder's thinking time is charged). A decline is final for that move; withdrawing, or the opponent playing / passing / swapping / challenging, cancels the request. The move stays in the history, marked void. Tahkim is unchanged and still the way to rule on a word.
-- **Pause** (online). Either player can stop both clocks: 2 pauses each, 3 minutes at most (`PAUSES_EACH`, `PAUSE_MS` in `js/config.js`); the other player can resume once the time is up, and any action after it resumes automatically. Board and racks are hidden while paused, so a pause cannot be used to think for free.
-- **Live preview.** The player on turn's tentative tiles appear to the opponent as dashed ghost tiles (a broadcast "draft": squares and letters only, bound to the revision, validated and bounded on receipt, never read by the server). The host can switch it off in the waiting room (rule *عرض القطع التي تجرّبها للخصم مباشرةً*).
-- **Word rules** (`js/wordrules.js`): the rules of which words may be played, in Arabic with an Indonesian line per rule, in **Settings → قواعد الكلمات**, one tap away inside every **Tahkim** dialog, and in the **waiting room** (so both players agree before starting).
-- **Setup errors say what to fix**: anonymous sign-ins off, wrong key, unreachable/paused project, function not deployed, missing migration, library failed to load. `pwa-check.html` (Settings → التطبيق) checks install conditions, the service worker and cache, and the Supabase project and function.
-- **Parity tests** (`tests/online/parity.mjs`): the server's shared modules are byte-identical to `js/`; random positions through `submit_move` give the same validity, error text, words and score as `js/rules.js` and as an independent scorer; every tile is accounted for after every action of random whole games; the end-of-game settlement equals `settleEnd`.
-
-## Tahkim by press-and-hold, verdict stamp, replay (v5.9.7)
+### Tahkim by press-and-hold, verdict stamp, replay (v5.9.7)
 
 - **Challenge a word:** the opponent's last word wears a thin underline while it can be challenged; press and hold it (about 0.7 s, a ring fills) to open the usual Tahkim flow. Mouse: hold, or right-click for a one-item menu. Keyboard: hold Enter / Space on a marked square. The history list also shows a small button on the last move. There is no Tahkim button any more; the hidden `#bJudge` stays as the single rule for whether a challenge is allowed, so the Tahkim chat, timers and the mutual verdict are untouched (`js/tkpress.js`).
 - **Verdict stamp:** صحيح / خطأ lands on the word once the verdict is settled, on both screens online (`js/stamp.js`).
 - **Replay:** when a game is over, the result dialog and the tool row offer a replay: board rebuilt move by move, timeline slider with a lead curve, play / pause / speed, Tahkim stamps replayed, final scores on the last step (`js/replay.js`). Moves now record the tiles placed (`tl`); the Edge Function stores and returns them too (redeploy `eas-game` for online games to carry letters; older games fall back to the final board).
 - Tests: `tests/e2e/tahkim-replay.py`.
-- v5.10.3 start-up audit (`docs/V5_10_3_CHANGES.md`): no CSS transitions while booting (1,131 start-up transitions on the board squares removed: Lighthouse TBT 2.1 s -> 0.7 s, non-composited animations 226 -> 0). Measured-and-rejected experiments and the remaining CLS/LCP findings are documented there.
-- v5.10.4 first-paint layout stability (`docs/V5_10_4_CHANGES.md`): the player panels and racks ship in `index.html` and a synchronous first-paint fit sets `--fill`/`--ui` before the first frame, so nothing moves when the modules arrive (mobile CLS 0.368 -> 0, desktop 0.055 -> 0 in a 10-run Lighthouse A/B). v5.10.4b: the landing screen (PLAY / ONLINE) is part of the first paint and the game area is built behind it, never shown unfinished (`data-app-ready`). Known remaining: Arabic web-font swap on non-fit layouts.
-- v5.11.0 Settings and navigation (`docs/V5_11_0_CHANGES.md`): Settings rebuilt as one system (Floating Mode is the first, essential setting, a real switch; match / look & layout / help below it; two columns in landscape and on desktop), rules moved out to the guide site (https://arscguide.vercel.app/, built-in rules only when offline), a quiet "main screen" button (Settings > main screen > PLAY / ONLINE, asks first during a match, nothing is lost), and a one-action update bar (Reload, no "later").
-- v5.10.2 (`docs/V5_10_2_CHANGES.md`): Normal landscape on phones: the players column and the dock no longer cover the board's edge columns, the bottom row and corners are reachable by touch drag (continuous, adaptive lift: `js/dropgeom.js`); the turn dot and the last-move corner dot are gone (last move = one adaptive ring).
-- v5.10.1 motion budget (`docs/V5_10_1_CHANGES.md`): the dock no longer animates width/margin/max-width after the check mark (instant state change + a compositor-only entrance); picked-tile flicker, panel turn glow and pause pulse animate opacity instead of `box-shadow`; no forced reflow to restart score animations.
-- v5.10.0 adaptive fit (`js/fit.js`, `css/fit.css`): on tall phones / portrait tablets everything under the board (panels, racks, dock, gaps) grows by the largest factor that still fits (at most 1.5) and what is left is split above and below; on screens >= 1000 px the board may grow past 880 px (up to 1500 px, height permitting) and the players + dock column grows with the screen height and is centred beside it. Floating Workspace, the Duel layout, short landscape layouts and screens too short to fit are not touched. Test: `tests/e2e/fit.py`.
-- v5.9.9 fixes: the hold survives what Android does during a long press (a `contextmenu` event about 0.5 s in, a focus change, small finger drift; no tooltip on touch devices); the word-log / Tahkim / chat drawer has a solid surface and a dimmed backdrop, its title no longer stretches over the tabs in non-Arabic languages, the tabs stay hidden in local games, and the quick replies wrap instead of being cut off.
 
-## Features
+### Features
 
 - Two-player local Arabic Scrabble on the classic 15×15 board
 - **Expanded** and **Basic** tile modes (chosen when a game starts)
@@ -77,7 +70,7 @@ Each player draws one tile and the higher value starts (a blank counts 0, a tie 
 
 There is no automatic dictionary: word validity is decided only by the players through tahkim.
 
-## Modes
+### Modes
 
 Both modes use the same engine, gameplay, board, scoring, timer, tahkim, UI, and features. **The only difference is the tile distribution and the blank-tile alphabet.**
 
@@ -90,7 +83,7 @@ Both modes use the same engine, gameplay, board, scoring, timer, tahkim, UI, and
 - Tiles are never normalised (`أ` stays `أ`, `ة` stays `ة`, …). The letter `ه` is stored as plain `ه`; the `هـ` face on the tile is display-only (`FACE` in `config.js`).
 - Both tile sets, their values and counts, and the blank alphabets live in `js/modes.js` as plain data. The engine just reads `TILE_MODES[app.mode]`.
 
-## Themes
+### Themes
 
 Themes only change presentation. They never affect the mode, tile distribution, scoring, timer, tahkim, board coordinates, placement, game state, history or layout. Choose one in **الإعدادات → المظهر**; it applies immediately without reloading and never resets the game.
 
@@ -103,18 +96,18 @@ Themes only change presentation. They never affect the mode, tile distribution, 
 
 The selected theme is stored in `localStorage` under `scrabble.theme`. If the value is missing, unreadable, or not a known theme id, the game falls back to Classic. Interface dimensions are stored separately under `scrabble.dims`, so resetting one never affects the other.
 
-### How themes work
+#### How themes work
 
 `js/themes.js` only sets `<html data-theme="id">`. All colours are CSS custom properties defined once per theme in `css/themes.css`; there is no per-element styling from JavaScript and no duplicated stylesheet. To add a theme, add a block in `themes.css` that defines every token, and an entry in `THEMES` in `themes.js`.
 
-## Tile effects and result screen
+### Tile effects and result screen
 
 - **Touch highlight, not a permanent glow.** A picked tile flickers (a 1 Hz colour pulse on its ring). It does so on every device, including when the OS asks to reduce motion: it is feedback, involves no movement, and `prefers-reduced-motion` still switches off every other animation and transition. Once placed, a tile has no glow and no coloured outline: an unscored (pending) tile is told apart by a golden tint and a lifted shadow, a scored one by plain ivory and a tight shadow. `tests/contrast.py` checks that the tint stays clearly different from a scored tile and that letters stay readable on it.
 - **Dynamic cast shadow.** Every tile on the board casts a shadow from its square (`.sq.has::before`, sized in container units so it scales with the board). It reacts to state: tight and dark at rest, shifted down and softer while the tile is pending (it "hovers"), and it converges from far and faint when a tile lands (`.fall`). Only `transform` and `opacity` are animated, so nothing is repainted; reduced-motion users get none of the animation.
 - **Game length** is a single row of five choices (number over "دقيقة"); the length in use is outlined.
 - **End of game** shows a centred announcement: the reason, the winner (or a draw), and one score card per player with the tile deduction and time bonus. The winner's card is outlined; a compact variant is used on short landscape screens so nothing scrolls.
 
-## History toggle
+### History toggle
 
 The history panel has a small button in its corner: **إخفاء السجل** (hide) / **إظهار السجل** (show).
 
@@ -124,7 +117,7 @@ The history panel has a small button in its corner: **إخفاء السجل** (h
 - The choice is a device preference stored in `localStorage` under `scrabble.historyVisible` (default: visible; a missing, invalid or unreadable value means visible). It is separate from `scrabble.theme` and `scrabble.dims`.
 - Known limit: with the history text set to its maximum (160%) in a very narrow history column in tight landscape layouts, the title can wrap under the button.
 
-## Messages, dialogue and Floating Workspace
+### Messages, dialogue and Floating Workspace
 
 Architecture in one line each: the **default layout** is stable, responsive CSS (nothing in Settings resizes it); **messages** always float; the **gameplay dialogue** is always floating and adjustable; **Floating Workspace** (الوضع العائم) is the only place where users move and resize the major modules, by direct manipulation. Settings only choose behaviour and presentation (theme, layout, button style, history mode, the workspace on/off switch); the old الأبعاد sliders are gone and a stale `scrabble.dims` value is deleted at start-up so it can never shrink the default board.
 
@@ -142,7 +135,7 @@ Architecture in one line each: the **default layout** is stable, responsive CSS 
 - Code: `js/float.js` (one engine for popups and modules), `js/layout.js`, `js/ui.js` (`ask()`, input lock), `css/float.css`. Game rules, scoring, clocks and board input are untouched.
 - Tests: `tests/layout/floating.mjs`.
 
-## Player names, word flash, touch feedback
+### Player names, word flash, touch feedback
 
 **Player names** (`js/names.js`, `js/nameedit.js`). A name is a device preference, like the theme and the layout: it changes how a player is *shown* (panels, rack label, history, toasts, tahkim dialogue, result, resume prompt), never a rule, score or clock. It is not stored inside a saved match.
 - In place: **press and hold** the name for half a second (a line fills under it), **double-click** it, or focus it and press **Enter / F2 / Space**. Enter or leaving the field keeps the name, **Esc** discards. The field takes over the label's exact row, so nothing around it moves. The clock of the player on turn is frozen while the field is open.
@@ -158,7 +151,7 @@ Architecture in one line each: the **default layout** is stable, responsive CSS 
 
 **Fullscreen**. The Game Tools button still exists in the Floating Workspace; Settings → التطبيق now also has a **ملء الشاشة** button, so the default layout can enter fullscreen too. Both hide themselves where the API does not exist (iPhone Safari) or the app already runs fullscreen.
 
-## Layout (الإعدادات → التخطيط)
+### Layout (الإعدادات → التخطيط)
 
 Device preferences stored in `localStorage` under `scrabble.layout`; they only set `data-layout`, `data-swap` and `data-hist` on `<html>` (`js/layout.js`).
 
@@ -177,92 +170,48 @@ Device preferences stored in `localStorage` under `scrabble.layout`; they only s
 
 Note: `tests/layout/history-toggle*.mjs` exercise the docked log, so the test helper `openGame` presets `scrabble.layout` to `{"hist":"docked","binfo":"on"}` (the old layout, bar shown: it doubles as the proof above) (override it with the `storage` option); `layout/log-icon.mjs` covers the default drawer.
 
-## PWA: install, offline play, match recovery
+### Floating Workspace: no size limits
+In Floating Workspace every module (board, both player panels, Turn Controls, Game Tools, word log) has **no maximum size** and only a tiny floor (it can never collapse to nothing).
+- Drag a module's corner grip, use the arrow keys / `+` `−` on it, or hold **Ctrl/⌘ and scroll** (or pinch on a trackpad) over it to resize around the pointer.
+- Content is proportional: type, padding, buttons and tiles scale with the module (`--fu`, see `js/float.js` `setUnit` and `css/float.css`). Untouched layouts look exactly as before.
+- A module larger than the screen can be panned by its strip until any edge (and its grips) is on screen; double-click the strip or grip to restore the default.
+- Saved sizes keep their proportions on other window sizes. Classic/Duel layouts and the gameplay dialogue keep their original limits.
 
-The game is an installable Progressive Web App. It is still plain static files: no build step, no backend, no framework.
+### How a game ends, and the final score
 
-### Two separate features (do not confuse them)
+A game ends in exactly two ways: **(1)** a player's clock reaches zero (a move that was not submitted is discarded), or **(2)** a player uses every tile once the bag is empty.
+**Passing and swapping are unlimited and never end the game**: a player who is ahead may keep passing to run the clock out. Words are judged by the players (tahkim); there is no dictionary.
 
-| Feature | What it stores | Where | Code |
-|---|---|---|---|
-| **Offline app cache** | the game's own files (HTML, CSS, JS, fonts, icons) | Cache Storage, filled by the service worker | `sw.js`, `js/pwa.js` |
-| **Match recovery** | the running match (board, racks, bag, scores, clocks, history, undo) | `localStorage` key `scrabble.match` | `js/persist.js` |
+> **Final score = score + 2 × (minutes left, rounded to the nearest minute) − value of the tiles still on the rack**
 
-Offline use is only promised after the first successful online visit has finished downloading the files: Settings → التطبيق shows "جاهزة للعمل دون إنترنت" only once the service worker has installed (its install step downloads every file or fails as a whole).
+Minutes are taken from the clock as displayed (whole seconds, rounded up) and rounded to the nearest minute; exactly half a minute rounds **down**: 2:30 → 2 (bonus 4), 2:31 → 3 (bonus 6), 0:29 → 0.
+There is no floor at zero: the formula is applied as stated. The result card shows each player's final score and only the parts that changed it (the time bonus, +2 per minute, and the tile deduction), and names the winner; it does not print the arithmetic.
+The rule lives in `js/config.js` (`TIME_BONUS_PER_MIN`, `REASONS`) and `js/scoring.js` (`bonusMinutes`, `finalScore`, pure and unit-tested); `js/game.js` `endGame` applies it; Settings → "نهاية اللعبة" states it to the players.
 
-### Files
+### Touch drag and drop
 
-```
-manifest.webmanifest      name, icons, display: standalone, start_url "./", scope "./"
-sw.js                     service worker (precache list, versioned cache, fetch strategy)
-js/pwa.js                 registration, update bar, install UI, offline status, theme-color sync
-js/persist.js             match save / validate / restore, resume prompt, pause-while-hidden
-css/pwa.css               install suggestion, update bar, iOS guide, standalone touch hardening
-assets/icons/             icon-192, icon-512, maskable-512, apple-touch-icon (180), favicon-32 (PNG)
-tools/stamp-sw.mjs        writes the cache version into sw.js (run before every deploy)
-tools/make-icons.mjs      dev-only: re-renders the PNG icons from tools/icon-source.html
-.nojekyll                 tells GitHub Pages not to run Jekyll over the files
-```
+Mouse: the browser's native drag and drop. Touch and pen: `js/touchdrag.js` (pointer events). A tap still selects a tile and a second tap places it; a drag starts after 8 px. While dragging, a larger copy of the tile floats just above the fingertip so the hand never covers the target, the square or rack slot under the copy is outlined when the tile may land there, and releasing drops it (anywhere else puts it back). The drop targets are judged by the same functions as the mouse path, so the rules are identical. Tiles use `touch-action: none` so the browser never scrolls or zooms from them.
 
-`id` is deliberately omitted from the manifest: it then defaults to `start_url`, which is already unique per deployment path. A fixed `id` would be resolved against the origin and could collide with other apps on the same `github.io` host. Add `"id": "/your-repo/"` only if you want to pin the identity to one known URL.
+### Support link
+The start screen has a quiet *ادعم تطوير اللعبة / Dukung pengembangan game ini* section with a button to https://saweria.co/esbepe83 (opens in a new tab with `rel="noopener noreferrer"`, so the game is never left). Markup in `index.html` (`#coverDonate`), styles in `css/cover.css` (compact on short screens; the cover scrolls instead of clipping on very small ones).
 
-### Caching strategy
+## Architecture (short)
 
-All URLs are relative and resolved against the service worker's scope (`self.registration.scope`), so the same files work at a domain root and under `https://user.github.io/repo/`.
+Details: `docs/ONLINE_ARCHITECTURE.md`. Database: `docs/MIGRATIONS.md`.
 
-- **install**: every file in `PRECACHE` is fetched with `cache: 'reload'` (never from a stale HTTP cache) into one versioned cache `arabic-scrabble-shell-<hash>`. If any file fails, the install fails, the partial cache is deleted and the previous version keeps serving. A half-downloaded version can never go live.
-- **activate**: all older `arabic-scrabble-*` caches are deleted and open pages are claimed.
-- **fetch**: app files come from the versioned cache only, so versions are never mixed. Navigations to the game (also with a query string) get the cached `index.html`. Other same-origin GET requests are network-first with a runtime-cache fallback; failed or non-basic responses are never stored; an unavailable file answers 503 instead of a fake success. Other origins, non-GET and `Range` requests are not touched.
-- **update**: a new worker installs in the background and *waits*. The game shows "يتوفر إصدار أحدث" with **تحديث الآن** / **لاحقًا**; only on agreement does the page tell the worker to take over and reload. A match in progress is saved continuously, so it is offered again after the reload. Updates are checked on load and when the app returns to the foreground (at most every 15 minutes).
-- **version**: `VERSION` in `sw.js` is a content hash of every precached file, written by `node tools/stamp-sw.mjs`. Browsers only re-install the worker when `sw.js` changes, so **you must stamp after changing any game file** (`--check` fails when it is stale; `tests/pwa/static.mjs` runs that check).
-
-### Match recovery
-
-- Saved (debounced, ~250 ms after each change, and always when the app is hidden or closed): mode, clock lengths and remaining times, board, racks, bag, scores, whose turn, blank letters, the unsubmitted move, undo snapshot, history (including tahkim verdicts).
-- Not saved: settings (they have their own keys and are never touched), an open dialog, an in-progress tile *swap* selection, a finished game, a game with no move yet.
-- On start-up, **PLAY** offers *متابعة* / *مباراة جديدة* when a valid save exists. Choosing a new game does not delete the old match until the new game really starts.
-- A save is used only if it is completely consistent (every tile exactly once, sane clocks, words made only of Arabic letters, current tile data). Anything else (corrupted, tampered, from an incompatible version) is discarded and the game starts normally. Storage that is unavailable or full simply means no recovery.
-- **Clocks pause while the app is in the background** (screen locked, app switched, tab hidden) and resume when it returns, so a phone call does not cost a player their time. This is the one behaviour change; set `PAUSE_CLOCK_WHEN_HIDDEN = false` in `js/persist.js` to restore the old behaviour.
-- Two windows playing at once on the same device would overwrite each other's save (last writer wins).
-
-### Deploying to GitHub Pages
-
-1. `node tools/stamp-sw.mjs` (needs Node 18+; only the version stamp, nothing is built) and commit the result.
-2. Push to GitHub. In the repository: **Settings → Pages → Build and deployment → Source: Deploy from a branch**, branch `main`, folder `/ (root)`, **Save**.
-3. Open `https://<user>.github.io/<repo>/` (HTTPS is provided by GitHub). Wait for the status line in Settings to say the game is ready for offline use, then test with airplane mode.
-4. Every later change: edit, `node tools/stamp-sw.mjs`, commit, push. Players get the update bar on their next visit.
-
-If you add or remove a file the game loads, update `PRECACHE` in `sw.js` (the static test lists any shipped file that is missing from it). Vercel, Netlify and any other static host work the same way, at the root or under a path.
-
-### Installing
-
-- **Android (Chrome, Edge, Samsung Internet)**: open the site; use the **تثبيت** button on the start screen or **الإعدادات → التطبيق → تثبيت التطبيق**, or the browser menu **⋮ → Install app / Add to Home screen**. The in-game buttons only appear when the browser has offered installation.
-- **Desktop Chrome / Edge**: same buttons, or the install icon in the address bar.
-- **iPhone and iPad (Safari)**: iOS has no install prompt. Tap **Share** (square with an up arrow; bottom bar on iPhone, top of the screen on iPad, sometimes inside **⋯**) → **Add to Home Screen** (under **View More** on some versions) → leave **Open as Web App** on if it is shown → **Add**. The app opens full screen from the new icon. The start screen shows a **طريقة التثبيت** button with these steps only on iOS/iPadOS in a browser tab; it is detected through `navigator.standalone`, not the user agent. The installed iOS app keeps its own storage, separate from Safari.
-- The suggestion on the start screen can be dismissed (it stays away for 30 days); the entry in Settings remains. Nothing claims the app is installed unless it is actually running as an installed app.
-
-### Known limitations
-
-- Install flows on real Android and iOS devices, real GitHub Pages HTTPS, and Safari service-worker behaviour were not tested by the author of this change; see the test notes below for what was.
-- iOS may evict a website's storage after a period of non-use; an app added to the Home Screen is not subject to that, a Safari tab can be.
-- Vibration and in-place name editing were verified in desktop Chromium (touch emulation, a stubbed `navigator.vibrate`), not on real phones. iOS Safari only opens the keyboard for a field focused directly from a tap, so after a long press on iPhone the field may need one more tap before the keyboard appears; Settings → اللاعبون always works. The iOS haptic is best-effort and iOS 18+ only.
-- Offline caching covers the app itself; there is nothing online to sync, so no background sync or push is used.
-
-## Technology
+### Technology
 
 HTML, CSS, vanilla JavaScript (ES Modules). No framework, no build step, no dependencies, no audio subsystem. Fonts (Amiri for Arabic, Tinos for Latin and digits) are bundled locally.
 
-## Running
 
-ES modules need to be served over HTTP (opening `index.html` from `file://` is blocked by browsers). From the project folder:
+### Code map (`js/`)
 
-```sh
-python3 -m http.server 8000
-```
+`float.js` is the public API of the floating engine; the engine itself is split by responsibility, with no import cycles:
+`float-core.js` (state, registry, z-order) → `float-fit.js` (vertical fit) → `float-geom.js` (viewport, limits, apply/commit) → `float-tools.js` (Game Tools) → `float-layout.js` (default geometry, refresh) → `float-input.js` (handles, grips, wheel) → `float-popups.js` (popups, input lock) → `float.js`.
+Messages: `notice(msg)` for a result, `warn(msg)` for a refused action or a hint (`toast(msg, ok)` is the low-level form both use).
 
-then open <http://localhost:8000>. Any static host (GitHub Pages, Netlify, …) works as-is.
 
-## Folder structure
+### Folder structure
 
 ```
 index.html
@@ -326,7 +275,85 @@ assets/
     Tinos-Bold.woff2
 ```
 
-## Tests
+
+### PWA: install, offline play, match recovery
+
+The game is an installable Progressive Web App. It is still plain static files: no build step, no backend, no framework.
+
+#### Two separate features (do not confuse them)
+
+| Feature | What it stores | Where | Code |
+|---|---|---|---|
+| **Offline app cache** | the game's own files (HTML, CSS, JS, fonts, icons) | Cache Storage, filled by the service worker | `sw.js`, `js/pwa.js` |
+| **Match recovery** | the running match (board, racks, bag, scores, clocks, history, undo) | `localStorage` key `scrabble.match` | `js/persist.js` |
+
+Offline use is only promised after the first successful online visit has finished downloading the files: Settings → التطبيق shows "جاهزة للعمل دون إنترنت" only once the service worker has installed (its install step downloads every file or fails as a whole).
+
+#### Files
+
+```
+manifest.webmanifest      name, icons, display: standalone, start_url "./", scope "./"
+sw.js                     service worker (precache list, versioned cache, fetch strategy)
+js/pwa.js                 registration, update bar, install UI, offline status, theme-color sync
+js/persist.js             match save / validate / restore, resume prompt, pause-while-hidden
+css/pwa.css               install suggestion, update bar, iOS guide, standalone touch hardening
+assets/icons/             icon-192, icon-512, maskable-512, apple-touch-icon (180), favicon-32 (PNG)
+tools/stamp-sw.mjs        writes the cache version into sw.js (run before every deploy)
+tools/make-icons.mjs      dev-only: re-renders the PNG icons from tools/icon-source.html
+.nojekyll                 tells GitHub Pages not to run Jekyll over the files
+```
+
+`id` is deliberately omitted from the manifest: it then defaults to `start_url`, which is already unique per deployment path. A fixed `id` would be resolved against the origin and could collide with other apps on the same `github.io` host. Add `"id": "/your-repo/"` only if you want to pin the identity to one known URL.
+
+#### Caching strategy
+
+All URLs are relative and resolved against the service worker's scope (`self.registration.scope`), so the same files work at a domain root and under `https://user.github.io/repo/`.
+
+- **install**: every file in `PRECACHE` is fetched with `cache: 'reload'` (never from a stale HTTP cache) into one versioned cache `arabic-scrabble-shell-<hash>`. If any file fails, the install fails, the partial cache is deleted and the previous version keeps serving. A half-downloaded version can never go live.
+- **activate**: all older `arabic-scrabble-*` caches are deleted and open pages are claimed.
+- **fetch**: app files come from the versioned cache only, so versions are never mixed. Navigations to the game (also with a query string) get the cached `index.html`. Other same-origin GET requests are network-first with a runtime-cache fallback; failed or non-basic responses are never stored; an unavailable file answers 503 instead of a fake success. Other origins, non-GET and `Range` requests are not touched.
+- **update**: a new worker installs in the background and *waits*. The game shows "يتوفر إصدار أحدث" with **تحديث الآن** / **لاحقًا**; only on agreement does the page tell the worker to take over and reload. A match in progress is saved continuously, so it is offered again after the reload. Updates are checked on load and when the app returns to the foreground (at most every 15 minutes).
+- **version**: `VERSION` in `sw.js` is a content hash of every precached file, written by `node tools/stamp-sw.mjs`. Browsers only re-install the worker when `sw.js` changes, so **you must stamp after changing any game file** (`--check` fails when it is stale; `tests/pwa/static.mjs` runs that check).
+
+#### Match recovery
+
+- Saved (debounced, ~250 ms after each change, and always when the app is hidden or closed): mode, clock lengths and remaining times, board, racks, bag, scores, whose turn, blank letters, the unsubmitted move, undo snapshot, history (including tahkim verdicts).
+- Not saved: settings (they have their own keys and are never touched), an open dialog, an in-progress tile *swap* selection, a finished game, a game with no move yet.
+- On start-up, **PLAY** offers *متابعة* / *مباراة جديدة* when a valid save exists. Choosing a new game does not delete the old match until the new game really starts.
+- A save is used only if it is completely consistent (every tile exactly once, sane clocks, words made only of Arabic letters, current tile data). Anything else (corrupted, tampered, from an incompatible version) is discarded and the game starts normally. Storage that is unavailable or full simply means no recovery.
+- **Clocks pause while the app is in the background** (screen locked, app switched, tab hidden) and resume when it returns, so a phone call does not cost a player their time. This is the one behaviour change; set `PAUSE_CLOCK_WHEN_HIDDEN = false` in `js/persist.js` to restore the old behaviour.
+- Two windows playing at once on the same device would overwrite each other's save (last writer wins).
+
+#### Deploying to GitHub Pages
+
+1. `node tools/stamp-sw.mjs` (needs Node 18+; only the version stamp, nothing is built) and commit the result.
+2. Push to GitHub. In the repository: **Settings → Pages → Build and deployment → Source: Deploy from a branch**, branch `main`, folder `/ (root)`, **Save**.
+3. Open `https://<user>.github.io/<repo>/` (HTTPS is provided by GitHub). Wait for the status line in Settings to say the game is ready for offline use, then test with airplane mode.
+4. Every later change: edit, `node tools/stamp-sw.mjs`, commit, push. Players get the update bar on their next visit.
+
+If you add or remove a file the game loads, update `PRECACHE` in `sw.js` (the static test lists any shipped file that is missing from it). Vercel, Netlify and any other static host work the same way, at the root or under a path.
+
+#### Installing
+
+- **Android (Chrome, Edge, Samsung Internet)**: open the site; use the **تثبيت** button on the start screen or **الإعدادات → التطبيق → تثبيت التطبيق**, or the browser menu **⋮ → Install app / Add to Home screen**. The in-game buttons only appear when the browser has offered installation.
+- **Desktop Chrome / Edge**: same buttons, or the install icon in the address bar.
+- **iPhone and iPad (Safari)**: iOS has no install prompt. Tap **Share** (square with an up arrow; bottom bar on iPhone, top of the screen on iPad, sometimes inside **⋯**) → **Add to Home Screen** (under **View More** on some versions) → leave **Open as Web App** on if it is shown → **Add**. The app opens full screen from the new icon. The start screen shows a **طريقة التثبيت** button with these steps only on iOS/iPadOS in a browser tab; it is detected through `navigator.standalone`, not the user agent. The installed iOS app keeps its own storage, separate from Safari.
+- The suggestion on the start screen can be dismissed (it stays away for 30 days); the entry in Settings remains. Nothing claims the app is installed unless it is actually running as an installed app.
+
+#### Known limitations
+
+- Install flows on real Android and iOS devices, real GitHub Pages HTTPS, and Safari service-worker behaviour were not tested by the author of this change; see the test notes below for what was.
+- iOS may evict a website's storage after a period of non-use; an app added to the Home Screen is not subject to that, a Safari tab can be.
+- Vibration and in-place name editing were verified in desktop Chromium (touch emulation, a stubbed `navigator.vibrate`), not on real phones. iOS Safari only opens the keyboard for a field focused directly from a tap, so after a long press on iPhone the field may need one more tap before the keyboard appears; Settings → اللاعبون always works. The iOS haptic is best-effort and iOS 18+ only.
+- Offline caching covers the app itself; there is nothing online to sync, so no background sync or push is used.
+
+
+## Deploy
+
+Step by step: `docs/DEPLOY_STEPS.md`. Canonical order (database, Edge Function, site) and environment: `docs/DEPLOYMENT.md`.
+
+## Testing
+
 
 Dev-only; the game itself has no dependencies. From the `tests/` folder:
 
@@ -347,38 +374,11 @@ The runner prints a per-suite summary and exits non-zero if any suite fails or c
 - `layout/baseline.json` is the reference layout the docked history panel must match while visible (originally measured before the toggle existed; re-taken after the control buttons became icon-only). If you change the docked layout on purpose, regenerate it from a trusted checkout (see the comment in `baseline.mjs`).
 - Known environment sensitivity: the pixel-residue check in `layout/history-toggle.mjs` can report a 1px full-width raster seam at the 360x640 viewport on some Chromium builds (it did on the build used while developing this change, with or without these edits). If it is the only failure, it is a screenshot artefact, not a layout regression.
 
+
+
+`npm test` (in `tests/`) now also runs `logic/endgame.mjs` (pure Node: the final-score formula and rounding) and `layout/float_modules.py` (real Chromium through Playwright for Python: touch drag with synthetic touch events, vertical-fit behaviour, the end-of-game result card, and a pass through every floating-module path; it starts its own server). After changing any shipped file run `node tools/stamp-sw.mjs`, otherwise installed copies will not update.
+
+
 ## Credits
 
 By esbepe. Evolved from [DAXEI08/update-version](https://github.com/DAXEI08/update-version).
-
-## Floating Workspace: no size limits
-In Floating Workspace every module (board, both player panels, Turn Controls, Game Tools, word log) has **no maximum size** and only a tiny floor (it can never collapse to nothing).
-- Drag a module's corner grip, use the arrow keys / `+` `−` on it, or hold **Ctrl/⌘ and scroll** (or pinch on a trackpad) over it to resize around the pointer.
-- Content is proportional: type, padding, buttons and tiles scale with the module (`--fu`, see `js/float.js` `setUnit` and `css/float.css`). Untouched layouts look exactly as before.
-- A module larger than the screen can be panned by its strip until any edge (and its grips) is on screen; double-click the strip or grip to restore the default.
-- Saved sizes keep their proportions on other window sizes. Classic/Duel layouts and the gameplay dialogue keep their original limits.
-
-## How a game ends, and the final score
-
-A game ends in exactly two ways: **(1)** a player's clock reaches zero (a move that was not submitted is discarded), or **(2)** a player uses every tile once the bag is empty.
-**Passing and swapping are unlimited and never end the game**: a player who is ahead may keep passing to run the clock out. Words are judged by the players (tahkim); there is no dictionary.
-
-> **Final score = score + 2 × (minutes left, rounded to the nearest minute) − value of the tiles still on the rack**
-
-Minutes are taken from the clock as displayed (whole seconds, rounded up) and rounded to the nearest minute; exactly half a minute rounds **down**: 2:30 → 2 (bonus 4), 2:31 → 3 (bonus 6), 0:29 → 0.
-There is no floor at zero: the formula is applied as stated. The result card shows each player's final score and only the parts that changed it (the time bonus, +2 per minute, and the tile deduction), and names the winner; it does not print the arithmetic.
-The rule lives in `js/config.js` (`TIME_BONUS_PER_MIN`, `REASONS`) and `js/scoring.js` (`bonusMinutes`, `finalScore`, pure and unit-tested); `js/game.js` `endGame` applies it; Settings → "نهاية اللعبة" states it to the players.
-
-## Touch drag and drop
-
-Mouse: the browser's native drag and drop. Touch and pen: `js/touchdrag.js` (pointer events). A tap still selects a tile and a second tap places it; a drag starts after 8 px. While dragging, a larger copy of the tile floats just above the fingertip so the hand never covers the target, the square or rack slot under the copy is outlined when the tile may land there, and releasing drops it (anywhere else puts it back). The drop targets are judged by the same functions as the mouse path, so the rules are identical. Tiles use `touch-action: none` so the browser never scrolls or zooms from them.
-
-## Code map (`js/`)
-
-`float.js` is the public API of the floating engine; the engine itself is split by responsibility, with no import cycles:
-`float-core.js` (state, registry, z-order) → `float-fit.js` (vertical fit) → `float-geom.js` (viewport, limits, apply/commit) → `float-tools.js` (Game Tools) → `float-layout.js` (default geometry, refresh) → `float-input.js` (handles, grips, wheel) → `float-popups.js` (popups, input lock) → `float.js`.
-Messages: `notice(msg)` for a result, `warn(msg)` for a refused action or a hint (`toast(msg, ok)` is the low-level form both use).
-
-## Tests
-
-`npm test` (in `tests/`) now also runs `logic/endgame.mjs` (pure Node: the final-score formula and rounding) and `layout/float_modules.py` (real Chromium through Playwright for Python: touch drag with synthetic touch events, vertical-fit behaviour, the end-of-game result card, and a pass through every floating-module path; it starts its own server). After changing any shipped file run `node tools/stamp-sw.mjs`, otherwise installed copies will not update.
