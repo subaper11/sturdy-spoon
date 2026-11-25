@@ -1,5 +1,7 @@
 // The production storage layer against a REAL Postgres: every migration file, the real SupabaseStore, the real service code, RLS and grants as the API roles see them.
 // What this does NOT prove: the Supabase platform itself (GoTrue JWTs, PostgREST, Realtime delivery, Edge runtime). See docs/V5_11_1_HARDENING_REPORT.md.
+import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
+const MIGRATIONS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../supabase/migrations');
 import { freshDb, applyFile, as, tryQ, serviceClient, migrationFiles } from './pg.mjs';
 import { SupabaseStore } from '../../supabase/functions/eas-game/store.ts';
 import { makeWorld, suite, across, uuidFrom, mulberry32 } from '../online/lib.mjs';
@@ -20,8 +22,8 @@ const giveRack = (w, k, letters) => w.db.query('update public.player_racks set t
 
 group('migrations');
 {
-  const files = migrationFiles(); ok(files.length === 11, `eleven migration files (${files.length})`);
-  const db = await freshDb(); ok(true, 'a clean database applies 01 -> 11 in order');
+  const files = migrationFiles(); ok(files.length === 12, `twelve migration files (${files.length})`);
+  const db = await freshDb(); ok(true, 'a clean database applies 01 -> 12 in order');
   const t = (await db.query(`select table_name from information_schema.tables where table_schema = 'public' order by 1`)).rows.map(r => r.table_name);
   ok(['game_actions', 'game_moves', 'game_players', 'game_private', 'games', 'join_misses', 'player_racks'].every(x => t.includes(x)), 'all seven tables exist: ' + t.join(','));
   const rls = (await db.query(`select relname, relrowsecurity from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'`)).rows;
@@ -200,6 +202,23 @@ group('cleanup status (migration 11)');
   ok((await q()).data === true, 'job present and active: true');
   await t.db.exec("update cron.job set active = false"); ok((await q()).data === false, 'job inactive: false');
   const d = await as(t.db, 'authenticated', t.users.A, x => tryQ(x, 'select public.eas_cleanup_scheduled()')); ok(!!d.error && /permission denied/i.test(d.error), 'not callable by API roles');
+  await t.db.close();
+}
+
+
+group('commit_action: one final definition (migration 12)');
+{
+  const t = await world(); const q = sql => t.db.query(sql).then(r => r.rows);
+  const defs = await q("select pg_get_functiondef(p.oid) d, p.prosecdef sd from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'commit_action'");
+  ok(defs.length === 1, 'exactly one commit_action in the database after all migrations (no overloads)');
+  ok(!/\brd\b/.test(defs[0].d), 'the unused variable rd is gone');
+  const fileOf = f => fs.readFileSync(path.join(MIGRATIONS, f), 'utf8'), last = migrationFiles().filter(f => /create or replace function public\.commit_action\(/.test(fileOf(f))).pop();
+  ok(/_12_|20261125000012/.test(last), 'the LAST migration that defines commit_action is the final one (' + last + ')');
+  const old = fileOf('20261101000005_eas_v5_1_pause_undo_live.sql'), fin = fileOf(last), grab = x => x.slice(x.indexOf('create or replace function public.commit_action('), x.indexOf('revoke all on function public.commit_action')).replace(/\s+/g, ' ');
+  ok(grab(old).replace(' rd int;', '') === grab(fin), 'identical to the 05 body except for the removed variable (behaviour unchanged)');
+  ok(defs[0].sd === true && /search_path/.test(defs[0].d), 'still security definer with a fixed search_path');
+  const grants = await t.db.query("select has_function_privilege('anon', 'public.commit_action(uuid,bigint,uuid,uuid,jsonb,jsonb)', 'execute') a, has_function_privilege('authenticated', 'public.commit_action(uuid,bigint,uuid,uuid,jsonb,jsonb)', 'execute') u, has_function_privilege('service_role', 'public.commit_action(uuid,bigint,uuid,uuid,jsonb,jsonb)', 'execute') s");
+  ok(!grants.rows[0].a && !grants.rows[0].u && grants.rows[0].s, 'executable by service_role only');
   await t.db.close();
 }
 

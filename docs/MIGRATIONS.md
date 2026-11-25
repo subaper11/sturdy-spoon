@@ -15,6 +15,7 @@ Nine forward-only files in `supabase/migrations/`, applied in filename order by 
 | 09 | `20261123000009_eas_v5_11_1_join_rate_limit.sql` | 5.11.1 | Table `join_misses` (RLS on, no policy, no client grant); `eas_join_blocked()` and `eas_join_miss()` (`security definer`, `search_path = ''`, `service_role` only). Touches no existing table or row | Yes (`if not exists`, `create or replace`) |
 | 10 | `20261125000010_eas_v5_12_create_rate_limit.sql` | 5.12.0 | `eas_rate_hit(keys, maxes, window_ms)` (`security definer`, `service_role` only): atomic per-key counter on the same `join_misses` table (keys prefixed `c:`), counts every attempt, true when any key is over its maximum. Used by `create_room`: per player 5/min and 30/h, per network address 15/min and 120/h (`RATE_LIMITED`). |
 | 11 | `20261125000011_eas_v5_12_cleanup_status.sql` | 5.12.0 | `eas_cleanup_scheduled()` (`security definer`, `service_role` only): true only when pg_cron exists and the job `eas-cleanup-stale-games` is active. Read by the Edge Function action `ops_health`; `pwa-check.html` shows a red row when it is false. |
+| 12 | `20261125000012_eas_v5_12_commit_action_final.sql` | 5.12.0 | The one `commit_action` that is in force: the 05 body with the unused `rd int` removed. Behaviour unchanged (a db test compares the bodies). |
 
 Dependencies: 02 needs 01; 03 needs 01–02; 04–05 replace functions from 03; 07's trigger needs the functions in 03/05; 09 stands alone but **the v5.11.1 Edge Function requires it** (a missing RPC makes `join_room` answer `SERVER_ERROR`).
 
@@ -23,3 +24,15 @@ Every historical deployment already depends on 01–08. Old installs upgrade by 
 Review notes (no change made, deployed history is not rewritten): the security-definer functions from 03/07 use `search_path = public` (migration 09 uses an empty path); this is acceptable because `anon`/`authenticated` hold no `CREATE` on `public` in Supabase, and a stricter path can be set in a future forward migration. `pg_cron` is optional: without it, run `select public.eas_cleanup_stale_games();` and `select public.eas_cleanup_anonymous_users(90);` periodically.
 
 **Not verified:** applying 01→09 to an empty Postgres and the upgrade path from each older state were not executed in this environment (no Postgres / Supabase CLI available). See `docs/V5_11_1_HARDENING_REPORT.md`.
+
+
+## Final definitions (which file is the truth)
+
+`create or replace` migrations leave older copies of a function in the history. Read the **last** file listed here, not the first one that mentions the name.
+
+| Function | In force from | Older copies (history only) |
+|---|---|---|
+| `commit_action` | `20261125000012_eas_v5_12_commit_action_final.sql` | 03, 05 |
+| `create_game_tx` | `20261101000005_eas_v5_1_pause_undo_live.sql` | 03, 04 |
+
+**Changing `commit_action` in future:** add a new migration (next number) containing the whole function (`create or replace function public.commit_action(...)`, then the same `revoke`/`grant` lines), change the row above, and keep `tests/db/postgres.mjs` ("commit_action: one final definition") pointing at it: that test fails when the last migration defining the function is not the one named as final, when more than one overload exists, or when it is executable by anon/authenticated.
