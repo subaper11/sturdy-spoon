@@ -39,3 +39,10 @@ Every phase below states which groups it could run. Browser groups stay unverifi
 ## Ditunda / Dibatalkan
 
 - Fase 2 to 6: see the final report. Entries are added here when a phase is started and not finished.
+
+### Fase 2 (Tahkim)
+- **Closing is not a verdict.** `close_tahkim` leaves the move valid with no penalty: nobody agreed it was wrong, and the challenger did not win the dispute either. `game_moves.tahkim_status` is set to `'ok'` (the existing check constraint allows only `ok`/`void`), so no migration was needed; "closed by timeout" is visible in `games.tahkim.state = 'closed_timeout'` and `ext.tahkim_log[].verdict = 'timeout'`.
+- **Not revision-pinned,** like `tahkim_vote`: both players act at once and the server's own state decides (a close after a verdict is refused `NOT_IN_TAHKIM`). Idempotent through the generic `client_action_id` path.
+- **Tahkim rules reference text changed** (one sentence in `js/tahkim-rules.js` and its English entry in `js/rules-en.js`): it used to promise "no time limit", which would now be false. Earlier you asked that Tahkim dialog rules not change without asking; this is the minimum to keep the reference true to the engine. Revert that sentence if you prefer, but the reference would then be wrong.
+- Rejected: auto-closing from the heartbeat or `claim_*` paths (would be a hidden side effect of unrelated requests); declaring the move void on timeout (rewards the player who stalls).
+- Not run here: the layout/e2e tests that render the Tahkim card (no browser). The countdown ticks with a 1 s `setInterval` that is cleared in `hideTahkim()`; verify on a device.

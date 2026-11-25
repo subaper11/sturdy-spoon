@@ -43,8 +43,11 @@ export const ABANDON_MS = 300000;   // 5 min (was 3): a phone that was put down 
 // each player gets PAUSES_EACH pauses per game, a pause lasts at most PAUSE_MS (the server lets either player resume after that), and the board and racks are hidden while it lasts.
 export const PAUSE_MS = 180000;
 
-// Tahkim (online) is a shared discussion that ends only when BOTH players select the same verdict. It has NO time limit and nothing lapses by itself:
-// a player who stays away is handled by the existing resign / abandon claim. These are only size limits for the stored discussion.
+// Tahkim (online) is a shared discussion that ends when BOTH players select the same verdict, or, after TAHKIM_MAX_MS, when either player closes it (below).
+// A player who stays away is handled by the existing resign / abandon claim. The other constants are size limits for the stored discussion.
+// A Tahkim discussion that has run for TAHKIM_MAX_MS without a mutual verdict may be closed by either player (action close_tahkim): the move stands, the clocks run again.
+// The server decides from its own timestamp (tahkim.requested_at), never from a browser clock.
+export const TAHKIM_MAX_MS = 10 * 60 * 1000;
 export const TAHKIM_CHAT_MAX = 200, TAHKIM_CHAT_EACH = 120, TAHKIM_MSG_MAX = 300, TAHKIM_LOG_MAX = 60;
 export const PAUSES_EACH = 2;
 

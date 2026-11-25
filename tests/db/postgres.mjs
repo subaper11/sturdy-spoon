@@ -4,7 +4,7 @@ import { freshDb, applyFile, as, tryQ, serviceClient, migrationFiles } from './p
 import { SupabaseStore } from '../../supabase/functions/eas-game/store.ts';
 import { makeWorld, suite, across, uuidFrom, mulberry32 } from '../online/lib.mjs';
 import { EXPANDED_TILES } from '../../supabase/functions/_shared/game/modes.js';
-import { ABANDON_MS } from '../../supabase/functions/_shared/game/config.js';
+import { ABANDON_MS, TAHKIM_MAX_MS } from '../../supabase/functions/_shared/game/config.js';
 const { ok, group, done } = suite('real Postgres: migrations, SupabaseStore, RLS');
 const VALUE = Object.fromEntries(EXPANDED_TILES.map(([l, v]) => [l, v])), SEC = 1000;
 
@@ -154,4 +154,23 @@ group('database cleanup functions run');
   ok(!(await w.sc.rpc('eas_cleanup_stale_games', {})).error, 'eas_cleanup_stale_games() executes as service_role');
   ok(!(await w.sc.rpc('eas_cleanup_anonymous_users', { p_days: 90 })).error || true, 'eas_cleanup_anonymous_users() is callable as service_role');
 }
+const db_row = t => t.db.query('select status, ext from public.games where id = $1', [t.gameId]).then(r => r.rows[0]);
+
+group('Tahkim that cannot be settled: close_tahkim against real Postgres');
+{
+  const t = await world(); await t.start({ minutes: 10 });
+  const mover = t.snap.A.game.current_seat === t.snap.A.me.seat ? 'A' : 'B', chall = mover === 'A' ? 'B' : 'A';
+  await giveRack(t, mover, [...'كتاب']); await t.call(mover, 'snapshot');
+  await t.call(mover, 'submit_move', { placements: across(t.snap[mover], 'كتاب') }); await t.call(chall, 'snapshot');
+  const rq = await t.call(chall, 'request_tahkim', { reason: 'كلمة غير مقبولة' }); const at = t.clock.t; await t.call(mover, 'snapshot');
+  ok(rq.ok && (await db_row(t)).status === 'tahkim_pending', 'dispute open in Postgres');
+  t.clock.t = at + TAHKIM_MAX_MS - 1; const early = await t.call(mover, 'close_tahkim'); ok(!early.ok && early.code === 'TAHKIM_NOT_EXPIRED', 'early close refused by the server clock');
+  t.clock.t = at + TAHKIM_MAX_MS; const r = await t.call(mover, 'close_tahkim'); ok(r.ok, 'close accepted at the limit: ' + (r.code || 'ok'));
+  const g = await db_row(t), mv = (await t.db.query('select tahkim_status, coalesce(penalty,0)::int penalty from public.game_moves where game_id = $1 order by turn_number', [t.gameId])).rows;
+  ok(g.status === 'active' && g.ext.tahkim_declined === 1 && g.ext.tahkim_log.length === 1 && g.ext.tahkim_log[0].verdict === 'timeout', 'games row: active, tahkim_declined = 1, one log record with verdict timeout');
+  ok(mv.length === 1 && mv[0].tahkim_status === 'ok' && mv[0].penalty === 0, 'game_moves row stays valid (ok), no penalty');
+  const dup = await t.raw(mover, { action: 'close_tahkim', game_id: t.gameId, client_action_id: '55555555-5555-4555-8555-555555555555' }); ok(!dup.ok && dup.code === 'NOT_IN_TAHKIM', 'nothing left to close');
+  await t.db.close();
+}
+
 await db.close(); done();

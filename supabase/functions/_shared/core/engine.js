@@ -8,7 +8,7 @@
 //
 // Rules are NOT re-implemented here: legality, words, scoring and the end-of-game settlement come from game/rules.js (shared with the local game).
 // There is no dictionary: whether a word is valid is decided by the players through Tahkim, exactly as in local play.
-import { SIZE, RACK, MIN_BAG_SWAP, DURATIONS, ABANDON_MS, PAUSE_MS, PAUSES_EACH, INCREMENT_MS, TAHKIM_CHAT_MAX, TAHKIM_CHAT_EACH, TAHKIM_MSG_MAX, TAHKIM_LOG_MAX, CHAT_KEEP, CHAT_REVS_KEEP, CHAT_MSG_MAX, CHAT_GAP_MS } from '../game/config.js';
+import { SIZE, RACK, MIN_BAG_SWAP, DURATIONS, ABANDON_MS, PAUSE_MS, PAUSES_EACH, INCREMENT_MS, TAHKIM_MAX_MS, TAHKIM_CHAT_MAX, TAHKIM_CHAT_EACH, TAHKIM_MSG_MAX, TAHKIM_LOG_MAX, CHAT_KEEP, CHAT_REVS_KEEP, CHAT_MSG_MAX, CHAT_GAP_MS } from '../game/config.js';
 import { TILE_MODES, tileValue, tileAlpha } from '../game/modes.js';
 import { analyzeMove, scoreWords, wordStr, makeTileSet, settleEnd, challengePenalty } from '../game/rules.js';
 import { fail } from './errors.js';
@@ -274,7 +274,8 @@ export function swapTiles(w, userId, req, now, deps) {
 //   * Each player may post chat messages and select a verdict (valid | invalid), and may change or withdraw it until the two selections are equal.
 //   * The moment the second, matching selection arrives the SERVER resolves the dispute inside the same commit (one transaction, revision compare-and-set):
 //     it can happen once only, and both players read the same result. A single selection can never resolve anything.
-//   * There is no time limit: nothing lapses by itself. A player who stays away is dealt with by the existing claim_abandon / resign actions.
+//   * A discussion that stays open for TAHKIM_MAX_MS (server time, tahkim.requested_at) may be closed by EITHER player (closeTahkim): the challenge lapses, the move stands, no penalty,
+//     the clocks run again from what each player had left, and the same move cannot be challenged again. A player who stays away is still dealt with by claim_abandon / resign.
 // The whole discussion (messages, both selections) lives in games.tahkim (public to the two players), so a refresh or a reconnection restores it exactly.
 // A reason is mandatory. Control characters and line breaks are removed.
 export const TAHKIM_REASON_MIN = 3, TAHKIM_REASON_MAX = 160;
@@ -343,6 +344,22 @@ export function tahkimVote(w, userId, req, now, deps) {
   g.tahkim = { ...g.tahkim, votes };
   if (votes[0] != null && votes[0] === votes[1]) return applyVerdict(w, votes[0], now, deps);   // both independently chose the same: the server finalises it atomically
   return { patch: patchOf(w, 'TAHKIM_VOTE') };   // different, or the other player has not chosen yet: the discussion continues
+}
+
+// A stuck dispute cannot hold the match for ever: once TAHKIM_MAX_MS have passed since the request, either player may close it. Server time decides (like claimTimeout).
+export function closeTahkim(w, userId, now) {
+  requireMember(w, userId);
+  const g = w.game, last = w.moves[w.moves.length - 1];
+  if (!isTahkim(g)) fail('NOT_IN_TAHKIM');
+  const t = g.tahkim;
+  if (!(now >= t.requested_at + TAHKIM_MAX_MS)) fail('TAHKIM_NOT_EXPIRED', undefined, { retry_in_ms: t.requested_at + TAHKIM_MAX_MS - now });
+  if (!w.priv.undo || !last) fail('NO_TAHKIM');
+  const rec = { move_number: t.move_number, round: g.round, words: t.words || [], challenger_seat: t.challenger_seat, reason: t.reason, verdict: 'timeout', at: now, players: [0, 1].map(s => playerBySeat(w, s)?.nickname || ''), messages: (t.chat || []).length };
+  setExt(g, { tahkim_log: [...(extOf(g).tahkim_log || []), rec].slice(-TAHKIM_LOG_MAX), tahkim_declined: t.move_number });   // declined: the same move cannot be challenged again
+  g.status = STATUS.ACTIVE; w.priv.undo = null; g.tahkim_available = false;
+  g.tahkim = { move_number: t.move_number, challenger_seat: t.challenger_seat, reason: t.reason, resolved_at: now, state: 'closed_timeout' };
+  restartClock(w, now);   // clocks were stopped at the request (settle()): each player resumes with what they had left
+  return { patch: patchOf(w, 'TAHKIM_CLOSED', { private: true, move_update: { turn_number: last.turn_number, tahkim_status: 'ok', penalty: 0 } }), verdict: 'timeout' };
 }
 
 // The agreed verdict is applied exactly once (the caller's commit is a single transaction guarded by the revision, and status leaves TAHKIM here).

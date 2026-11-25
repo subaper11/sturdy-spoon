@@ -1,7 +1,7 @@
 // Rules reference for the Tahkim discussion: an accordion of five categories, every number taken from the SAME constants the game engine uses (config.js, modes.js),
 // so what a player reads here cannot drift from what the server enforces. Word rules come from wordrules.js (the document both players agreed on).
 // Each player opens and closes their own panel and categories; nothing here is shared or sent anywhere.
-import { BINGO, RACK, MIN_BAG_SWAP, PENALTY, INCREMENT_MS, TIME_BONUS_PER_MIN, PAUSES_EACH, PAUSE_MS, LABEL, CENTER } from './config.js';
+import { BINGO, RACK, MIN_BAG_SWAP, PENALTY, INCREMENT_MS, TIME_BONUS_PER_MIN, PAUSES_EACH, PAUSE_MS, TAHKIM_MAX_MS, LABEL, CENTER } from './config.js';
 import { TILE_MODES, ADAPTIVE, ALIF_FORMS } from './modes.js';
 import { OK, NO, CHECK, L, EX, one, H } from './wordrules.js';
 
@@ -17,7 +17,7 @@ export const turn = () => [
   ['تبدأ الساعة بعد أول حركة. يبدأ اللعب بسحب قطعة لكل لاعب: الأعلى قيمةً يبدأ.', 'Jam mulai setelah langkah pertama. Pemain pertama ditentukan dengan menarik satu tile: nilai tertinggi mulai.'],
   [`ساعة الشطرنج: تُضاف ${INCREMENT_MS / 1000} ثوانٍ بعد كل حركة تضع فيها قطعًا. لا تُضاف عند التمرير أو التبديل أو إبطال الحركة.`, `Jam catur: +${INCREMENT_MS / 1000} detik setiap langkah yang menaruh tile (tidak untuk pass, tukar, atau langkah yang dibatalkan).`],
   [`التحكيم يطلبه اللاعب صاحب الدور على آخر حركة لخصمه. «صحيح»: تبقى الحركة ويدفع صاحب الطلب غرامة ${PENALTY} نقاط (أو نقاطه إن كانت أقل). «خطأ»: تُلغى الحركة وتعود القطع واللوح والنقاط، ويأخذ صاحب الطلب الدور.`, `Tahkim diajukan pemain yang sedang giliran atas langkah terakhir lawan. «صحيح»: langkah tetap, penantang kena denda ${PENALTY} poin (atau sisa poinnya). «خطأ»: langkah batal, papan/tile/poin kembali, penantang mendapat giliran.`],
-  [`الإيقاف المؤقت عبر الإنترنت: ${PAUSES_EACH} لكل لاعب، ${min(PAUSE_MS)} دقائق كحد أقصى. أثناء التحكيم تتوقف الساعتان تلقائيًا بلا حد زمني.`, `Jeda online: ${PAUSES_EACH} kali per pemain, maksimal ${min(PAUSE_MS)} menit. Selama Tahkim kedua jam otomatis berhenti tanpa batas waktu.`],
+  [`الإيقاف المؤقت عبر الإنترنت: ${PAUSES_EACH} لكل لاعب، ${min(PAUSE_MS)} دقائق كحد أقصى. أثناء التحكيم تتوقف الساعتان تلقائيًا؛ وإن مرّت ${min(TAHKIM_MAX_MS)} دقائق دون اتفاق يمكن لأي لاعب إغلاق التحكيم: تبقى الحركة وتعود الساعتان.`, `Jeda online: ${PAUSES_EACH} kali per pemain, maksimal ${min(PAUSE_MS)} menit. Selama Tahkim kedua jam otomatis berhenti; setelah ${min(TAHKIM_MAX_MS)} menit tanpa kesepakatan, pemain mana pun dapat menutup Tahkim: langkah tetap berlaku dan jam berjalan lagi.`],
   ['الاستسلام: تصبح نقاط المستسلم صفرًا فورًا ويفوز خصمه تلقائيًا.', 'Menyerah: skor penyerah langsung 0 dan lawan menang otomatis.']
 ];
 

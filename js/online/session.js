@@ -322,6 +322,7 @@ async function tkCall(action, extra) {
 const tkHandlers = {
   send: async text => !!(await tkCall('tahkim_message', { text }))?.ok,
   vote: async verdict => !!(await tkCall('tahkim_vote', { verdict }))?.ok,
+  close: async () => !!(await tkCall('close_tahkim', {}))?.ok,
   leave: () => $('#netLeave').click()   // surrender stays reachable from inside the focused card
 };
 // Match chat: like the Tahkim discussion it is not a "turn" action (not pinned to a revision, no waiting behind other requests); the same client_action_id is reused by the network retry.
@@ -338,7 +339,7 @@ const chatHandlers = {
 };
 function tahkimUI(snap, force = false) {
   const jd = $('#jd'), g = snap.game;
-  const opened = updateTahkim(snap, { seat: snap.me.seat, names: [nameIso(0), nameIso(1)], mode: g.tile_mode, handlers: tkHandlers });
+  const opened = updateTahkim(snap, { seat: snap.me.seat, names: [nameIso(0), nameIso(1)], mode: g.tile_mode, handlers: tkHandlers, now: () => Date.now() + (net.clock?.offset || 0) });
   if (opened) { haptic('tick'); if (jd.open && app.judge?.kind === 'reason') { net.closingJudge = true; jd.close(); net.closingJudge = false; app.judge = null; } }
   if (jd.open && app.judge?.kind === 'reason' && (g.status !== 'active' || S.cur !== snap.me.seat)) { net.closingJudge = true; jd.close(); net.closingJudge = false; app.judge = null; }   // the position changed under the open form
   undoUI(snap);
@@ -397,7 +398,8 @@ function notes(old, snap) {
   const la = (old.game.tahkim_log || []).length, lb = (snap.game.tahkim_log || []).length;
   if (lb > la) {   // the server confirmed an agreement: both players are told the same thing
     const r = snap.game.tahkim_log[lb - 1], who = nameIso(r.challenger_seat);
-    notice(r.verdict === 'valid' ? `اتفقتما على: ✔ صحيح — تبقى الحركة ويدفع ${who} غرامة التحكيم` : `اتفقتما على: ✖ خطأ — أُلغيت الحركة ويأخذ ${who} الدور`);
+    if (r.verdict === 'timeout') notice('انتهت مهلة التحكيم: أُغلق دون حكم، وتبقى الحركة وتعود الساعتان.');
+    else notice(r.verdict === 'valid' ? `اتفقتما على: ✔ صحيح — تبقى الحركة ويدفع ${who} غرامة التحكيم` : `اتفقتما على: ✖ خطأ — أُلغيت الحركة ويأخذ ${who} الدور`);
   }
   const pa = old.game.pause, pb = snap.game.pause;
   if (pa && !pb && snap.game.status === 'active') notice('استُؤنفت اللعبة');

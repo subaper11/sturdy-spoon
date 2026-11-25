@@ -2,6 +2,14 @@
 
 All per-version notes of EAS Online, newest first. The README describes the game as it is now; this file records how it got there. Per-version details: `docs/V5_*_CHANGES.md`, `docs/V5_*_BUILD_REPORT.md`.
 
+## 5.12.0 (audit release, in progress)
+
+Protocol change: `APP_VERSION` is bumped so the two devices of a match can tell a stale page from a current one.
+
+- **Tahkim can no longer be held hostage (Fase 2).** New action `close_tahkim`: after `TAHKIM_MAX_MS` (10 minutes, `js/config.js`, server copy by `tools/sync-edge-shared.mjs`) without a mutual verdict, either player may close the dispute. The challenge lapses, the move stands (no void, no penalty), the status returns to `active`, both clocks resume from what each player had left, `ext.tahkim_declined` blocks a second challenge of the same move, and `tahkim_log` records it with `verdict: 'timeout'`. The server decides from `tahkim.requested_at` (its own timestamp); idempotent by `client_action_id`; not revision-pinned (like `tahkim_vote`). UI: countdown and a "close" button in the Tahkim card (`js/online/tahkim-ui.js`), texts in Arabic / Indonesian / English. Tests: `tests/online/tahkim-timeout.mjs`, `tests/db/postgres.mjs`.
+- The Tahkim rules reference (`js/tahkim-rules.js`, `js/rules-en.js`) no longer says the clocks stop "without a time limit"; it states the 10-minute close rule.
+- Release hygiene (Fase 1): `APP_VERSION` was 5.11.0 while the docs said 5.11.1; a static test now fails if `APP_VERSION`, the README header and the newest CHANGELOG entry disagree. README split into README + CHANGELOG. `tests/run-all.mjs` registered five suites that never ran in `npm test` (`cors`, `body`, `ratelimit` were hidden inside a `//` comment; `chat`, `adaptive` were never listed).
+
 ## 5.11.1 (release candidate)
 
 **v5.11.1 RC (release candidate).** Hardening of v5.11.0: heartbeat error handling, reproducible tests, shared room-code rate limiting, fail-closed CORS, request-size limit, faster first load, stable Arabic layout. It stays an RC until the release gates in `docs/V5_11_1_HARDENING_REPORT.md` (section 10) have passed. Deploy in the order given in `docs/DEPLOYMENT.md`.

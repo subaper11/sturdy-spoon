@@ -5,6 +5,7 @@
 // Per-device interface state (never sent): the rules panel open or not and which categories are open, the verdict I have picked but not yet confirmed, my unsent text.
 import { localize, setTxt, bt } from '../i18n.js';
 import { tahkimRulesHtml } from '../tahkim-rules.js';
+import { TAHKIM_MAX_MS } from '../config.js';
 
 const VERDICT = { valid: '✔ صحيح', invalid: '✖ خطأ' };
 const $ = s => document.querySelector(s);
@@ -25,6 +26,7 @@ function build() {
     + `<div class="tkVerdict"><div id="tkChips" class="tkChips"></div><div id="tkStatus" class="tkStatus" role="status"></div>`
     + `<div class="tkActs" role="group" aria-label="اختيار الحكم"><button type="button" class="btn yes tkPick" data-v="valid" aria-pressed="false">✔ صحيح</button><button type="button" class="btn danger tkPick" data-v="invalid" aria-pressed="false">✖ خطأ</button>`
     + `<button type="button" id="tkConfirm" class="btn main tkConfirm"></button><button type="button" id="tkWithdraw" class="btn tkWd">سحب اختياري</button></div></div>`
+    + `<div id="tkClose" class="tkClose" hidden><span id="tkCloseT" class="tkCloseT" role="status"></span><button type="button" id="tkCloseBtn" class="btn tkWd" disabled>إغلاق التحكيم</button></div>`
     + `<form id="tkForm" class="tkComposer" autocomplete="off"><label class="vh" for="tkText">رسالة</label><textarea id="tkText" rows="1" maxlength="300" placeholder="اكتب رسالتك…" enterkeyhint="send"></textarea><button type="submit" class="btn main" id="tkSend">إرسال</button></form>`;
   const bd = el('div', 'tkBackdrop'); bd.id = 'tkBackdrop'; bd.hidden = true; bd.setAttribute('aria-hidden', 'true');
   localize(p);
@@ -42,6 +44,7 @@ function build() {
   p.addEventListener('click', e => {
     const b = e.target.closest('.tkPick'); if (b) { ui.pick = b.dataset.v; ui.pickKey = ui.key; paint(); return; }
   });
+  $('#tkCloseBtn').onclick = async () => { if (ui.closing) return; ui.closing = true; paintClose(); try { await ui.h.close(); } finally { ui.closing = false; paintClose(); } };
   $('#tkConfirm').onclick = () => vote(ui.pick);
   $('#tkWithdraw').onclick = () => { ui.pick = null; vote(null); };
   const ta = $('#tkText');
@@ -71,6 +74,7 @@ export function updateTahkim(s, c) {
   ui.chatN = (g.tahkim.chat || []).length;
   paint();
   if (fresh) enter();
+  if (!ui.timer) ui.timer = setInterval(paintClose, 1000);
   return fresh;
 }
 // Focus mode: the page behind is blurred (backdrop) and inert, so nothing outside the card can be reached by touch, mouse, Tab or a screen reader.
@@ -84,7 +88,7 @@ export function hideTahkim() {
   snap = null; ctx = null;   // a request still in flight must not repaint (and re-show) the window with the old state when it finishes
   if (!ui.built) return;
   const p = $('#tkPanel'); if (p.hidden) return;
-  p.hidden = true; $('#tkBackdrop').hidden = true; ui.key = ''; ui.sig = '';
+  p.hidden = true; $('#tkBackdrop').hidden = true; ui.key = ''; ui.sig = ''; clearInterval(ui.timer); ui.timer = 0;
   const app = $('main.app'); if (app) app.inert = false;
   document.documentElement.removeAttribute('data-tkopen');
   return false;
@@ -108,6 +112,16 @@ function marked(text, words) {
   return frag;
 }
 
+// The limit is the server's: tahkim.requested_at (server time) + TAHKIM_MAX_MS, read against the server-aligned clock the session gives us (ctx.now).
+// The button only enables when the countdown is over; the server refuses an early close anyway.
+function paintClose() {
+  if (!snap || !ctx || !ui.built) return;
+  const t = snap.game.tahkim, left = (t.requested_at || 0) + TAHKIM_MAX_MS - (ctx.now ? ctx.now() : Date.now()), box = $('#tkClose'), b = $('#tkCloseBtn');
+  box.hidden = false;
+  const mm = Math.floor(Math.max(0, left) / 60000), ss = Math.ceil(Math.max(0, left) % 60000 / 1000), clock = `${mm}:${String(ss === 60 ? 59 : ss).padStart(2, '0')}`;
+  setTxt($('#tkCloseT'), left > 0 ? `يمكن إغلاق التحكيم بعد ${clock}` : 'انتهت مهلة التحكيم: يمكن لأيٍّ منكما إغلاقه، وتبقى الحركة.');
+  b.disabled = left > 0 || !!ui.closing;
+}
 function paint() {
   if (!snap || !ctx || !ui.built) return;
   const g = snap.game, t = g.tahkim, me = snap.me.seat, opp = 1 - me, N = ctx.names, chat = t.chat || [], votes = t.votes || [null, null];
@@ -128,7 +142,7 @@ function paint() {
       const b = el('div', 'tkMsg' + (m.s === me ? ' mine' : '')); b.dataset.n = m.n;
       const tx = el('span', 'tkTxt'); tx.append(marked(m.t, words)); b.append(el('span', 'tkWho', N[m.s]), tx, el('span', 'tkAt', hhmm(m.at)));
       return b;
-    }) : [el('p', 'tkEmpty', 'لا رسائل بعد. ناقشا الكلمة هنا؛ لا يوجد حدّ زمني، والساعتان متوقفتان.')]));
+    }) : [el('p', 'tkEmpty', `لا رسائل بعد. ناقشا الكلمة هنا؛ الساعتان متوقفتان، ويمكن إغلاق التحكيم بعد ${Math.round(TAHKIM_MAX_MS / 60000)} دقائق.`)]));
     if (near) log.scrollTop = log.scrollHeight;
   }
   // selections (both visible: the discussion is open, and a match resolves at once)
@@ -148,5 +162,6 @@ function paint() {
   setTxt(cf, label); cf.disabled = !changed || ui.voting;
   const wd = $('#tkWithdraw'); wd.hidden = !mine; wd.disabled = ui.voting;
   $('#tkSend').disabled = ui.sending; $('#tkText').readOnly = ui.sending;
+  paintClose();
   localize(p);   // the reason line and the discussion were rebuilt: their second language
 }

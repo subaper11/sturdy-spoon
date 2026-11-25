@@ -73,3 +73,5 @@ html[data-tahkim] .board,html[data-tahkim] .rack{filter:saturate(.7)}
 .hTkI{padding:6px 8px;border-radius:8px;background:var(--surface-inset);border-inline-start:4px solid var(--accent);font-size:.9rem;line-height:1.55;overflow-wrap:anywhere}
 .hTkI .v{font-weight:700}.hTkI .v.valid{color:var(--verdict-ok)}.hTkI .v.invalid{color:var(--verdict-bad)}
 .hTkI .m{opacity:.75;font-size:.8rem}
+
+.tkClose{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-top:1px solid var(--panel-line);font-size:.8rem}.tkClose[hidden]{display:none}.tkCloseT{flex:1 1 auto;min-width:0}

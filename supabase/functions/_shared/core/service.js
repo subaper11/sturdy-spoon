@@ -55,6 +55,7 @@ export async function handleRequest(store, userId, body, deps) {
       case 'tahkim_message': return await mutate(store, userId, body, now, deps, (w) => E.tahkimMessage(w, userId, body, now));
       case 'chat_message': return await mutate(store, userId, body, now, deps, (w) => E.chatMessage(w, userId, body, now));
       case 'tahkim_vote': return await mutate(store, userId, body, now, deps, (w) => E.tahkimVote(w, userId, body, now, deps));
+      case 'close_tahkim': return await mutate(store, userId, body, now, deps, (w) => E.closeTahkim(w, userId, now));
       case 'request_undo': return await mutate(store, userId, body, now, deps, (w) => E.requestUndo(w, userId, now));
       case 'cancel_undo': return await mutate(store, userId, body, now, deps, (w) => E.cancelUndo(w, userId));
       case 'respond_undo': return await mutate(store, userId, body, now, deps, (w) => E.respondUndo(w, userId, body, now, deps));

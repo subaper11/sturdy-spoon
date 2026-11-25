@@ -1,6 +1,6 @@
 # Arabic Scrabble Multiplayer Online
 
-**Version 5.11.1** (release candidate; see `CHANGELOG.md`).
+**Version 5.12.0** (audit release; see `CHANGELOG.md`).
 
 ## Summary
 

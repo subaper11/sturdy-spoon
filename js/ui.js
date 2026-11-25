@@ -289,7 +289,7 @@ function renderTahkimLog() {
   const t = ms => { try { return new Date(ms).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); } catch { return ''; } };
   $('#hTkL').replaceChildren(...log.map(r => {
     const li = document.createElement('li'); li.className = 'hTkI';
-    const w = document.createElement('div'); w.append(`الحركة ${r.move_number} · `, Object.assign(document.createElement('b'), {textContent: (r.words || []).join(' · ')}), ' — ', Object.assign(document.createElement('span'), {className: 'v ' + r.verdict, textContent: r.verdict === 'valid' ? '✔ صحيح' : '✖ خطأ'}));
+    const w = document.createElement('div'); w.append(`الحركة ${r.move_number} · `, Object.assign(document.createElement('b'), {textContent: (r.words || []).join(' · ')}), ' — ', Object.assign(document.createElement('span'), {className: 'v ' + r.verdict, textContent: r.verdict === 'valid' ? '✔ صحيح' : r.verdict === 'timeout' ? '⏱ أُغلق (مهلة)' : '✖ خطأ'}));
     const a = document.createElement('div'); a.textContent = `طلبه ${nameIso(r.challenger_seat)} · السبب: «${r.reason}»`;
     const m = document.createElement('div'); m.className = 'm'; m.textContent = `${nameIso(0)} و${nameIso(1)} · ${t(r.at)}`;
     li.append(w, a, m); return li;
