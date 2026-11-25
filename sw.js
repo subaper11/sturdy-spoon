@@ -19,7 +19,7 @@
  */
 'use strict';
 
-const VERSION = '83081f5038c4';   // stamped by tools/stamp-sw.mjs
+const VERSION = '86266618e38c';   // stamped by tools/stamp-sw.mjs
 const PREFIX = 'arabic-scrabble-';
 const SHELL = `${PREFIX}shell-${VERSION}`;
 const RUNTIME = `${PREFIX}runtime-${VERSION}`;
@@ -99,6 +99,7 @@ const PRECACHE = [
   "js/persist.js",
   "js/pwa.js",
   "js/online/env.js",
+  "js/online/captcha.js",
   "js/online/supabase-backend.js",
   "js/online/session.js",
   "js/online/draft.js",

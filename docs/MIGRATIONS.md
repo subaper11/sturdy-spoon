@@ -14,6 +14,7 @@ Nine forward-only files in `supabase/migrations/`, applied in filename order by 
 | 08 | `…08_eas_v5_6_adaptive_mode.sql` | 5.6 | `games_tile_mode_check` now allows `expanded`, `basic`, `adaptive` | Yes |
 | 09 | `20261123000009_eas_v5_11_1_join_rate_limit.sql` | 5.11.1 | Table `join_misses` (RLS on, no policy, no client grant); `eas_join_blocked()` and `eas_join_miss()` (`security definer`, `search_path = ''`, `service_role` only). Touches no existing table or row | Yes (`if not exists`, `create or replace`) |
 | 10 | `20261125000010_eas_v5_12_create_rate_limit.sql` | 5.12.0 | `eas_rate_hit(keys, maxes, window_ms)` (`security definer`, `service_role` only): atomic per-key counter on the same `join_misses` table (keys prefixed `c:`), counts every attempt, true when any key is over its maximum. Used by `create_room`: per player 5/min and 30/h, per network address 15/min and 120/h (`RATE_LIMITED`). |
+| 11 | `20261125000011_eas_v5_12_cleanup_status.sql` | 5.12.0 | `eas_cleanup_scheduled()` (`security definer`, `service_role` only): true only when pg_cron exists and the job `eas-cleanup-stale-games` is active. Read by the Edge Function action `ops_health`; `pwa-check.html` shows a red row when it is false. |
 
 Dependencies: 02 needs 01; 03 needs 01–02; 04–05 replace functions from 03; 07's trigger needs the functions in 03/05; 09 stands alone but **the v5.11.1 Edge Function requires it** (a missing RPC makes `join_room` answer `SERVER_ERROR`).
 

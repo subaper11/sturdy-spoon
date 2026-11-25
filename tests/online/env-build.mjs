@@ -34,4 +34,9 @@ ok(b.code === 0 && b.cfg.anonKey === '' && /DISABLED/.test(b.out) && /key: none/
 b = build({});
 ok(b.code === 0 && /URL: none; key: none/.test(b.out), 'nothing set: local play still builds');
 ok(!/abcdefgh|h\./.test(build({ SUPABASE_URL: URL, SUPABASE_ANON_KEY: ANON }).out.replace(/URL from|key from/g, '')), 'the log never prints the values');
+group('optional captcha site key');
+b = build({ SUPABASE_URL: URL, SUPABASE_ANON_KEY: ANON }); ok(b.code === 0 && !('turnstileSiteKey' in b.cfg), 'no TURNSTILE_SITE_KEY: env.js has no captcha field (sign-in unchanged)');
+b = build({ SUPABASE_URL: URL, SUPABASE_ANON_KEY: ANON, TURNSTILE_SITE_KEY: '0x4AAAAAAAtest' }); ok(b.code === 0 && b.cfg.turnstileSiteKey === '0x4AAAAAAAtest' && b.cfg.url === URL && /captcha on/.test(b.out), 'with it: the PUBLIC site key is written, nothing else changes');
+const be = fs.readFileSync(path.resolve(HERE, '../../js/online/supabase-backend.js'), 'utf8');
+ok(/siteKey \? \{ options: \{ captchaToken: await captchaToken\(siteKey\) \} \} : undefined/.test(be), 'sign-in passes a token only when a site key exists');
 done();

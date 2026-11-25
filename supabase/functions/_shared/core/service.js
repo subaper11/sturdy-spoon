@@ -54,6 +54,7 @@ export async function handleRequest(store, userId, body, deps) {
       case 'join_room': return await joinRoom(store, userId, body, now, deps);
       case 'reconnect': return await reconnect(store, userId, now, deps);
       case 'snapshot': return await readSnapshot(store, userId, body, now, deps);
+      case 'ops_health': return { ok: true, cleanup_scheduled: (await store.cleanupScheduled?.()) === true };   // any signed-in user may ask; says nothing about games
       case 'heartbeat': return await heartbeat(store, userId, body, now, deps);
       case 'set_ready': return await mutate(store, userId, body, now, deps, (w) => E.setReady(w, userId, body.ready));
       case 'update_settings': return await mutate(store, userId, body, now, deps, (w) => E.updateSettings(w, userId, body.settings));

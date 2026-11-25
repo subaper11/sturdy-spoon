@@ -9,6 +9,7 @@
 // Every failure that leaves this file carries `info = { code, text, detail }`: `text` is a plain Arabic sentence that says WHAT to fix (see explain()), `detail` is
 // the technical line to show underneath it (and to paste into a bug report).
 import { ONLINE_ENV } from './env.js';
+import { captchaToken } from './captcha.js';
 
 // Same-origin copy (assets/vendor, pinned 2.49.4, MIT): no CDN at runtime, precached by the service worker. Rebuild with tools/vendor-supabase.mjs.
 export const SUPABASE_JS = new URL('../../assets/vendor/supabase-js.2.49.4.esm.js', import.meta.url).href;
@@ -51,7 +52,7 @@ export async function createBackend() {
     async init() {
       try {
         let { data: { session } } = await sb.auth.getSession();
-        if (!session) { const r = await sb.auth.signInAnonymously(); if (r.error) throw r.error; session = r.data.session; }
+        if (!session) { const siteKey = ONLINE_ENV.turnstileSiteKey, r = await sb.auth.signInAnonymously(siteKey ? { options: { captchaToken: await captchaToken(siteKey) } } : undefined); if (r.error) throw r.error; session = r.data.session; }
         userId = session.user.id; return userId;
       } catch (e) { throw tag(e, 'auth'); }
     },

@@ -86,4 +86,11 @@ group('migration 20261125000010 is server-only');
   ok(/security definer set search_path = ''/.test(sql) && /revoke all on function public\.eas_rate_hit\(text\[\], integer\[\], integer\) from public, anon, authenticated/.test(sql) && /grant execute on function public\.eas_rate_hit\(text\[\], integer\[\], integer\) to service_role/.test(sql), 'security definer, empty search_path, service_role only');
   ok(/on conflict \(key\) do update/.test(sql) && !/drop |truncate|delete from public\.(games|game_)/i.test(sql), 'atomic upsert, touches no game data');
 }
+group('ops_health: is the clean-up job scheduled? (production needs pg_cron)');
+{
+  const w = makeWorld({ seed: 31, who: ['A'] });
+  const on = await handleRequest(w.store, w.users.A, { action: 'ops_health' }, w.deps); ok(on.ok && on.cleanup_scheduled === true, 'reports a scheduled job');
+  w.store.cronOn = false; const off = await handleRequest(w.store, w.users.A, { action: 'ops_health' }, w.deps); ok(off.ok && off.cleanup_scheduled === false && Object.keys(off).sort().join() === 'cleanup_scheduled,ok', 'reports an unscheduled job, and nothing else');
+  const bad = await handleRequest(w.store, 'not-a-uuid', { action: 'ops_health' }, w.deps); ok(!bad.ok, 'needs a signed-in user');
+}
 done();

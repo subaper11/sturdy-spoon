@@ -98,6 +98,14 @@ async function run() {
         if (r.ok) {
           const f = await get(ONLINE_ENV.url.replace(/\/$/, '') + '/functions/v1/eas-game', { method: 'OPTIONS' }).catch(e => ({ ok: false, status: 0, e }));
           add(f.status === 404 ? 'bad' : f.status === 0 ? 'warn' : 'ok', f.status === 404 ? 'الدالة eas-game غير منشورة' : f.status === 0 ? 'تعذّر الوصول إلى الدالة eas-game' : 'الدالة eas-game موجودة', 'HTTP ' + f.status, f.status === 404 ? 'انشرها: supabase functions deploy eas-game' : f.status === 0 ? 'قد يكون السبب الشبكة أو قيمة ALLOWED_ORIGIN.' : '');
+          if (f.status !== 404 && f.status !== 0 && !ONLINE_ENV.turnstileSiteKey) {   // needs a session; skipped when captcha is on (a token would be needed)
+            try {
+              const base = ONLINE_ENV.url.replace(/\/$/, ''), s = await (await get(base + '/auth/v1/signup', { method: 'POST', headers: { apikey: ONLINE_ENV.anonKey, 'content-type': 'application/json' }, body: '{}' })).json();
+              const h = await (await get(base + '/functions/v1/eas-game', { method: 'POST', headers: { apikey: ONLINE_ENV.anonKey, authorization: 'Bearer ' + s.access_token, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'ops_health' }) })).json();
+              if (h.ok) add(h.cleanup_scheduled ? 'ok' : 'bad', h.cleanup_scheduled ? 'مهمة التنظيف (pg_cron) مجدولة' : 'مهمة التنظيف غير مجدولة: pg_cron مطلوب في الإنتاج', h.cleanup_scheduled ? '' : 'بدونها تبقى الألعاب المهجورة وجداول الحدّ من التخمين في القاعدة.', h.cleanup_scheduled ? '' : 'فعّل pg_cron: Database ← Extensions، ثم أعد تشغيل ملف الترحيل 20261104000007 (انظر docs/DEPLOYMENT.md).');
+              else add('warn', 'تعذّر فحص مهمة التنظيف', 'الدالة لا تعرف الإجراء ops_health (نسخة قديمة؟).', 'انشر الدالة: supabase functions deploy eas-game');
+            } catch (e) { add('warn', 'تعذّر فحص مهمة التنظيف', '', 'الدخول المجهول مغلق أو الشبكة تمنع الطلب.', String(e)); }
+          }
         }
       } catch (e) { add('bad', 'تعذّر الوصول إلى Supabase', host, 'تحقق من الإنترنت ومن رابط المشروع ومن أنه غير متوقف.', String(e)); }
     }

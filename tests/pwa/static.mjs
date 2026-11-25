@@ -155,6 +155,13 @@ ok(bLog && /aria-label="[^"]+"/.test(bLog[0]) && /<svg class="ic"/.test(bLog[1])
   ok(sw.includes('"assets/vendor/supabase-js.2.49.4.esm.js"'), 'the vendored build is in PRECACHE');
   ok(fs.existsSync(new URL('../../assets/vendor/supabase-js.2.49.4.esm.js', import.meta.url)) && /export\{[^}]*createClient/.test(rd('assets/vendor/supabase-js.2.49.4.esm.js').slice(-3000)), 'the vendored file exists and exports createClient');
 }
+// --- CSP: scripts are allowed by hash, not by 'unsafe-inline'
+{
+  const vj = rd('vercel.json'), ro = /Content-Security-Policy-Report-Only", "value": "([^"]*)"/.exec(vj)?.[1] || '', sd = /script-src ([^;]*)/.exec(ro)?.[1] || '';
+  ok(sd && !/unsafe-inline|unsafe-eval|\*/.test(sd), 'script-src has no unsafe-inline, unsafe-eval or wildcard: ' + sd.replace(/'sha256-[^']*'/g, 'sha256-…'));
+  let st = 0; try { execFileSync('node', ['tools/csp-hashes.mjs', '--check'], { cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'), stdio: 'pipe' }); } catch { st = 1; }
+  ok(st === 0, 'every inline <script> of index.html and pwa-check.html has its hash in the CSP (node tools/csp-hashes.mjs to refresh)');
+}
 // --- release consistency: APP_VERSION, README header and the newest CHANGELOG entry must name the same version
 {
   const v = /APP_VERSION = '([^']+)'/.exec(rd('js/version.js'))?.[1];

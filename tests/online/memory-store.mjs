@@ -38,6 +38,7 @@ export class MemoryStore {
   }
   // Same contract as the SQL limiter, kept per store like the table is per database: fixed window from the first miss.
   joinBlocked(keys, maxes, windowMs, now) { this.misses ||= new Map(); return keys.some((k, i) => { const m = this.misses.get(k); return !!m && m.n >= maxes[i] && now - m.since < windowMs; }); }
+  cleanupScheduled() { return this.cronOn !== false; }
   rateHit(keys, maxes, windowMs, now) {   // same contract as eas_rate_hit: fixed window from the first hit, every attempt counts, true when any key is over its max
     this.hits ||= new Map(); let over = false;
     keys.forEach((k, i) => { const m = this.hits.get(k); if (!m || now - m.since >= windowMs) this.hits.set(k, { n: 1, since: now }); else m.n++; if (this.hits.get(k).n > maxes[i]) over = true; });
